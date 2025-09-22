@@ -3,7 +3,7 @@
  * Plugin Name: AL Pack - 워드프레스를 위한 통계, 광고 도구
  * Plugin URI: https://alpack.dev
  * Description: 통계, 글쓰기 SEO, 무효 트래픽 차단, 빠른 버튼 생성, 카카오 공유 버튼, 스크롤 팝업, 애드클리커 등 워드프레스를 위한 통합 플러그인
- * Version: 1.2.1
+ * Version: 1.2.2
  * Author: 프레스런
  * Author URI: https://alpack.dev
  * Text Domain: alpack
@@ -2212,7 +2212,8 @@ function presslearn_add_ad_protection_script() {
     }
     
     $max_click_count = intval(get_option('presslearn_max_click_count', 10));
-    
+    $click_time_window = intval(get_option('presslearn_click_time_window', 30));
+
     wp_register_style('presslearn-protection-modal-css', false);
     wp_enqueue_style('presslearn-protection-modal-css');
     
@@ -2360,13 +2361,49 @@ function presslearn_add_ad_protection_script() {
         " . ($should_reset ? "resetLocalStorageForUnblock();" : "") . "
         
         const maxClickCount = " . esc_js($max_click_count) . ";
+        const clickTimeWindow = " . esc_js($click_time_window) . ";
         
+        function checkServerBlockStatus() {
+            fetch('" . esc_js(admin_url('admin-ajax.php')) . "', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    action: 'presslearn_check_ip_block_status',
+                    nonce: '" . esc_js(wp_create_nonce('presslearn_check_block_status')) . "'
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    if (!data.data.is_blocked) {
+                        const localBlocked = getStorageItem('adsenseBlocked') === 'true';
+                        if (localBlocked) {
+                            setStorageItem('adsenseBlocked', 'false');
+                            setStorageItem('adsenseBlockedTime', '0');
+                        }
+                    } else {
+                        setStorageItem('adsenseBlocked', 'true');
+                        if (!getStorageItem('adsenseBlockedTime')) {
+                            setStorageItem('adsenseBlockedTime', Date.now().toString());
+                        }
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Block status check failed:', error);
+            });
+        }
+        
+        checkServerBlockStatus();
+
         function checkAndResetClickCount() {
             const firstClickTime = getStorageItem('adsenseFirstClickTime', '0');
             const currentTime = Date.now();
-            const thirtyMinutes = 30 * 60 * 1000;
+            const timeWindowMs = clickTimeWindow * 60 * 1000;
             
-            if (firstClickTime !== '0' && (currentTime - parseInt(firstClickTime)) > thirtyMinutes) {
+            if (firstClickTime !== '0' && (currentTime - parseInt(firstClickTime)) > timeWindowMs) {
                 setStorageItem('adsenseClickCount', '0');
                 setStorageItem('adsenseFirstClickTime', '0');
                 return 0;
@@ -2378,15 +2415,24 @@ function presslearn_add_ad_protection_script() {
         
         const clickCount = checkAndResetClickCount();
         
-        const isBlocked = getStorageItem('adsenseBlocked') === 'true';
+        let isBlocked = getStorageItem('adsenseBlocked') === 'true';
         const blockedTime = getStorageItem('adsenseBlockedTime');
         
-        if (isBlocked && blockedTime) {
-            const timeDiff = Date.now() - parseInt(blockedTime);
-            const blockExpiryDays = window.presslearn_protection_config ? window.presslearn_protection_config.block_expiry_days : 30;
-            if (timeDiff > blockExpiryDays * 24 * 60 * 60 * 1000) {
+        if (isBlocked) {
+            if (!blockedTime || isNaN(parseInt(blockedTime))) {
                 setStorageItem('adsenseBlocked', 'false');
-                setStorageItem('adsenseClickCount', '0');
+                setStorageItem('adsenseBlockedTime', '0');
+                isBlocked = false;
+            } else {
+                const timeDiff = Date.now() - parseInt(blockedTime);
+                const blockExpiryDays = window.presslearn_protection_config ? window.presslearn_protection_config.block_expiry_days : 30;
+                if (timeDiff > blockExpiryDays * 24 * 60 * 60 * 1000) {
+                    setStorageItem('adsenseBlocked', 'false');
+                    setStorageItem('adsenseClickCount', '0');
+                    setStorageItem('adsenseFirstClickTime', '0');
+                    setStorageItem('adsenseBlockedTime', '0');
+                    isBlocked = false;
+                }
             }
         }
         
@@ -2678,6 +2724,46 @@ function presslearn_block_current_ip_ajax() {
 
 add_action('wp_ajax_presslearn_block_current_ip', 'presslearn_block_current_ip_ajax');
 add_action('wp_ajax_nopriv_presslearn_block_current_ip', 'presslearn_block_current_ip_ajax');
+
+function presslearn_check_ip_block_status_ajax() {
+    check_ajax_referer('presslearn_check_block_status', 'nonce');
+    
+    $click_protection_enabled = get_option('presslearn_click_protection_enabled', 'no');
+    if ($click_protection_enabled !== 'yes') {
+        wp_send_json_success(array('is_blocked' => false));
+        wp_die();
+    }
+    
+    $user_ip = presslearn_plugin()->get_visitor_ip_for_protection();
+    
+    $allowed_ips = get_option('presslearn_click_protection_allowed_ips', array());
+    foreach ($allowed_ips as $item) {
+        if ($item['ip'] === $user_ip) {
+            wp_send_json_success(array('is_blocked' => false, 'reason' => 'allowed'));
+            wp_die();
+        }
+    }
+    
+    $blocked_ips = get_option('presslearn_click_protection_blocked_ips', array());
+    $is_blocked = false;
+    
+    foreach ($blocked_ips as $item) {
+        if ($item['ip'] === $user_ip) {
+            $is_blocked = true;
+            break;
+        }
+    }
+    
+    wp_send_json_success(array(
+        'is_blocked' => $is_blocked,
+        'ip' => $user_ip
+    ));
+    
+    wp_die();
+}
+
+add_action('wp_ajax_presslearn_check_ip_block_status', 'presslearn_check_ip_block_status_ajax');
+add_action('wp_ajax_nopriv_presslearn_check_ip_block_status', 'presslearn_check_ip_block_status_ajax');
 
 function presslearn_unblock_ip_with_reset() {
     check_ajax_referer('presslearn_ip_nonce', 'nonce');

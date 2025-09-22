@@ -665,6 +665,11 @@ function presslearn_protection_admin_scripts() {
             modalTitleInput.addEventListener('input', function() {
                 const previewTitle = document.getElementById('preview-title');
                 if (previewTitle) previewTitle.textContent = this.value;
+                const form = document.getElementById('click-protection-settings-form');
+                if (form) {
+                    const hiddenInput = form.querySelector('input[name=\"modal_title\"]');
+                    if (hiddenInput) hiddenInput.value = this.value;
+                }
             });
         }
         
@@ -672,6 +677,11 @@ function presslearn_protection_admin_scripts() {
             modalMessageInput.addEventListener('input', function() {
                 const previewMessage = document.getElementById('preview-message');
                 if (previewMessage) previewMessage.textContent = this.value;
+                const form = document.getElementById('click-protection-settings-form');
+                if (form) {
+                    const hiddenInput = form.querySelector('input[name=\"modal_message\"]');
+                    if (hiddenInput) hiddenInput.value = this.value;
+                }
             });
         }
         
@@ -679,6 +689,11 @@ function presslearn_protection_admin_scripts() {
             modalSubmessageInput.addEventListener('input', function() {
                 const previewSubmessage = document.getElementById('preview-submessage');
                 if (previewSubmessage) previewSubmessage.textContent = this.value;
+                const form = document.getElementById('click-protection-settings-form');
+                if (form) {
+                    const hiddenInput = form.querySelector('input[name=\"modal_submessage\"]');
+                    if (hiddenInput) hiddenInput.value = this.value;
+                }
             });
         }
         
@@ -686,6 +701,11 @@ function presslearn_protection_admin_scripts() {
             modalButtonTextInput.addEventListener('input', function() {
                 const previewButton = document.getElementById('preview-button');
                 if (previewButton) previewButton.textContent = this.value;
+                const form = document.getElementById('click-protection-settings-form');
+                if (form) {
+                    const hiddenInput = form.querySelector('input[name=\"modal_button_text\"]');
+                    if (hiddenInput) hiddenInput.value = this.value;
+                }
             });
         }
         
@@ -698,23 +718,15 @@ function presslearn_protection_admin_scripts() {
                 
                 const form = document.getElementById('click-protection-settings-form');
                 if (form) {
-                    const existingInputs = form.querySelectorAll('input[name^=\"modal_\"]');
-                    existingInputs.forEach(input => input.remove());
+                    const titleInput = form.querySelector('input[name=\"modal_title\"]');
+                    const messageInput = form.querySelector('input[name=\"modal_message\"]');
+                    const submessageInput = form.querySelector('input[name=\"modal_submessage\"]');
+                    const buttonTextInput = form.querySelector('input[name=\"modal_button_text\"]');
                     
-                    const inputs = [
-                        {name: 'modal_title', value: modalTitle},
-                        {name: 'modal_message', value: modalMessage},
-                        {name: 'modal_submessage', value: modalSubmessage},
-                        {name: 'modal_button_text', value: modalButtonText}
-                    ];
-                    
-                    inputs.forEach(inputData => {
-                        const input = document.createElement('input');
-                        input.type = 'hidden';
-                        input.name = inputData.name;
-                        input.value = inputData.value;
-                        form.appendChild(input);
-                    });
+                    if (titleInput) titleInput.value = modalTitle;
+                    if (messageInput) messageInput.value = modalMessage;
+                    if (submessageInput) submessageInput.value = modalSubmessage;
+                    if (buttonTextInput) buttonTextInput.value = modalButtonText;
                 }
                 
                 document.getElementById('modal-settings-editor').style.display = 'none';

@@ -45,6 +45,10 @@ if (isset($_POST['save_click_protection_settings'])) {
         if ($max_click_count < 1) $max_click_count = 1;
         if ($max_click_count > 100) $max_click_count = 100;
         
+        $click_time_window = isset($_POST['click_time_window']) ? intval(wp_unslash($_POST['click_time_window'])) : 30;
+        if ($click_time_window < 1) $click_time_window = 1;
+        if ($click_time_window > 1440) $click_time_window = 1440;
+        
         $use_cloudflare = isset($_POST['use_cloudflare']) ? 'yes' : 'no';
         
         $block_expiry_days = isset($_POST['block_expiry_days']) ? intval(wp_unslash($_POST['block_expiry_days'])) : 30;
@@ -60,6 +64,7 @@ if (isset($_POST['save_click_protection_settings'])) {
         $modal_button_text = isset($_POST['modal_button_text']) ? sanitize_text_field(wp_unslash($_POST['modal_button_text'])) : '확인';
         
         update_option('presslearn_max_click_count', $max_click_count);
+        update_option('presslearn_click_time_window', $click_time_window);
         update_option('presslearn_click_protection_use_cloudflare', $use_cloudflare);
         update_option('presslearn_click_protection_block_expiry_days', $block_expiry_days);
         update_option('presslearn_modal_title', $modal_title);
@@ -73,6 +78,7 @@ if (isset($_POST['save_click_protection_settings'])) {
 
 $click_protection_enabled = get_option('presslearn_click_protection_enabled', 'no');
 $max_click_count = get_option('presslearn_max_click_count', 10);
+$click_time_window = get_option('presslearn_click_time_window', 30);
 $use_cloudflare = get_option('presslearn_click_protection_use_cloudflare', 'no');
 $block_expiry_days = get_option('presslearn_click_protection_block_expiry_days', 30);
 
@@ -144,13 +150,26 @@ $modal_button_text = get_option('presslearn_modal_button_text', '확인');
             <form method="post" action="" id="click-protection-settings-form">
                 <?php wp_nonce_field('presslearn_save_click_protection_settings_nonce'); ?>
                 <input type="hidden" name="save_click_protection_settings" value="1">
+                <input type="hidden" name="modal_title" value="<?php echo esc_attr($modal_title); ?>">
+                <input type="hidden" name="modal_message" value="<?php echo esc_attr($modal_message); ?>">
+                <input type="hidden" name="modal_submessage" value="<?php echo esc_attr($modal_submessage); ?>">
+                <input type="hidden" name="modal_button_text" value="<?php echo esc_attr($modal_button_text); ?>">
                 
                 <div class="presslearn-card-body-row">
                     <div class="presslearn-card-body-row-item grid-left">
                         <h3>최대 허용 클릭 수</h3>
                     </div>
                     <div class="presslearn-card-body-row-item grid-right">
-                        <input type="number" class="regular-text" name="max_click_count" value="<?php echo esc_attr($max_click_count); ?>">
+                        <input type="number" class="regular-text" name="max_click_count" value="<?php echo esc_attr($max_click_count); ?>" min="1" max="100">
+                    </div>
+                </div>
+                
+                <div class="presslearn-card-body-row">
+                    <div class="presslearn-card-body-row-item grid-left">
+                        <h3>클릭 감지 시간(분)</h3>
+                    </div>
+                    <div class="presslearn-card-body-row-item grid-right">
+                        <input type="number" class="regular-text" name="click_time_window" value="<?php echo esc_attr($click_time_window); ?>" min="1" max="1440">
                     </div>
                 </div>
                 

@@ -46,6 +46,12 @@ $header_footer_enabled = get_option('presslearn_header_footer_enabled', 'no');
         </div>
     </div>
 
+    <div class="presslearn-notice-banner" id="presslearn-notice-banner">
+        <a href="#" id="presslearn-notice-link" target="_blank" class="presslearn-notice-link">
+            <span class="presslearn-notice-skeleton"></span>
+        </a>
+    </div>
+
     <div class="wrap">
         <?php 
         $show_updated_notice = false;
@@ -376,3 +382,32 @@ $header_footer_enabled = get_option('presslearn_header_footer_enabled', 'no');
     </div>
 
 
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const noticeLink = document.getElementById('presslearn-notice-link');
+    const noticeBanner = document.getElementById('presslearn-notice-banner');
+    
+    if (noticeLink && noticeBanner) {
+        fetch('<?php echo esc_url(rest_url('presslearn/v1/notice')); ?>', {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-WP-Nonce': '<?php echo esc_attr(wp_create_nonce('wp_rest')); ?>'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.data) {
+                noticeLink.innerHTML = '<strong>공지사항</strong> ' + data.data.title;
+                noticeLink.href = data.data.link;
+            } else {
+                noticeBanner.classList.add('error');
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching notice:', error);
+            noticeBanner.classList.add('error');
+        });
+    }
+});
+</script>

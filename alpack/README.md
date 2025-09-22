@@ -4,7 +4,7 @@ Tags: 통계, 애드클리커, 소셜 공유, 무효 트래픽 클릭 차단, �
 Requires at least: 5.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.2.1
+Stable tag: 1.2.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -79,6 +79,12 @@ AL Pack 플러그인 공지사항 및 배너 송출을 위해 [프레스런](htt
 문제가 발생하거나 추가 지원이 필요한 경우 [AL Pack 디스커션 페이지](https://alpack.dev)를 방문하거나 [이메일](info@loword.co.kr)로 문의해 주세요. 
 
 == Changelog ==
+= 1.2.2 =
+* 메인 설정 내 Alpack Discussion 공지사항 영역 추가
+* 애드 프로텍터의 Timeout 설정 옵션 추가
+* 애드 프로텍터의 모달 커스터마이즈 초기화 현상 수정
+* 제 추석 여행지는 후쿠오카입니다.
+
 = 1.2.1 =
 * 애드 프로텍터의 로컬 스토리지 Timeout 추가
 * 기타 마이너 이슈 해결

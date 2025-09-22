@@ -102,6 +102,12 @@ class PressLearn_API {
             'callback' => array(__CLASS__, 'get_banner'),
             'permission_callback' => array(__CLASS__, 'check_permission'),
         ));
+        
+        register_rest_route('presslearn/v1', '/notice', array(
+            'methods' => 'GET',
+            'callback' => array(__CLASS__, 'get_latest_notice'),
+            'permission_callback' => array(__CLASS__, 'check_permission'),
+        ));
     }
 
     public static function check_permission($request) {
@@ -386,6 +392,72 @@ class PressLearn_API {
         return array(
             'success' => true,
             'data' => $data[0]
+        );
+    }
+    
+    public static function get_latest_notice($request) {
+        $cache_key = 'presslearn_latest_notice';
+        $cached_notice = get_transient($cache_key);
+        
+        if ($cached_notice !== false) {
+            return array(
+                'success' => true,
+                'data' => $cached_notice
+            );
+        }
+        
+        $feed_url = 'https://alpack.dev/category/notice/feed/';
+        
+        $response = wp_remote_get($feed_url, array(
+            'timeout' => 10,
+            'user-agent' => 'PressLearn Plugin/' . get_bloginfo('url'),
+            'sslverify' => true
+        ));
+        
+        if (is_wp_error($response)) {
+            error_log('PressLearn Notice Feed Error: ' . $response->get_error_message());
+            return new WP_Error(
+                'notice_fetch_error',
+                '공지사항을 가져오는데 실패했습니다.',
+                array('status' => 500)
+            );
+        }
+        
+        $body = wp_remote_retrieve_body($response);
+        
+        $xml = simplexml_load_string($body, 'SimpleXMLElement', LIBXML_NOCDATA);
+        
+        if ($xml === false) {
+            return new WP_Error(
+                'notice_parse_error',
+                '공지사항 데이터 파싱에 실패했습니다.',
+                array('status' => 500)
+            );
+        }
+        
+        $latest_notice = array();
+        if (isset($xml->channel->item[0])) {
+            $item = $xml->channel->item[0];
+            $latest_notice = array(
+                'title' => (string) $item->title,
+                'link' => (string) $item->link,
+                'date' => date('Y-m-d', strtotime((string) $item->pubDate))
+            );
+            
+            set_transient($cache_key, $latest_notice, DAY_IN_SECONDS);
+        }
+        
+        if (empty($latest_notice)) {
+            return new WP_Error(
+                'no_notice',
+                '공지사항이 없습니다.',
+                array('status' => 404)
+            );
+        }
+        
+        return array(
+            'success' => true,
+            'data' => $latest_notice
         );
     }
 }
