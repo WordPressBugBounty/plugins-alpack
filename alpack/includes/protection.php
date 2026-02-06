@@ -30,6 +30,100 @@ function presslearn_protection_admin_styles() {
     wp_enqueue_style('presslearn-protection-admin-css');
     
     $protection_css = "
+    .country-tag-container {
+        display: flex;
+        width: 100%;
+        flex-wrap: wrap;
+        gap: 8px;
+        flex: 1;
+        min-height: 100px;
+        padding: 5px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        background: #fff;
+        align-items: flex-start;
+        box-sizing: border-box;
+    }
+    
+    .country-tag {
+        display: inline-flex;
+        align-items: center;
+        background: #2196F3;
+        color: white;
+        padding: 4px 10px;
+        border-radius: 16px;
+        font-size: 13px;
+        gap: 6px;
+    }
+    
+    .country-tag .country-code {
+        background: rgba(255, 255, 255, 0.2);
+        padding: 2px 6px;
+        border-radius: 10px;
+        font-size: 11px;
+        font-weight: bold;
+    }
+    
+    .country-tag .remove-country {
+        cursor: pointer;
+        margin-left: 4px;
+        font-weight: bold;
+        opacity: 0.8;
+        transition: opacity 0.2s;
+    }
+    
+    .country-tag .remove-country:hover {
+        opacity: 1;
+    }
+    
+    .country-autocomplete {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: white;
+        border: 1px solid #ddd;
+        border-top: none;
+        max-height: 200px;
+        overflow-y: auto;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        z-index: 1000;
+        display: none;
+    }
+    
+    .country-autocomplete-item {
+        padding: 10px 15px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    
+    .country-autocomplete-item:hover,
+    .country-autocomplete-item.active {
+        background: #f0f0f0;
+    }
+    
+    .country-name {
+        flex: 1;
+    }
+    
+    .country-code-badge {
+        background: #e0e0e0;
+        padding: 2px 8px;
+        border-radius: 10px;
+        font-size: 12px;
+        color: #666;
+    }
+    
+    .ip-add-form {
+        position: relative;
+    }
+    
+    #blocked-country-input {
+        width: 100%; 
+    }
+    
     .presslearn-modal {
         position: fixed;
         z-index: 9999;
@@ -128,9 +222,9 @@ function presslearn_protection_admin_styles() {
     }
 
     .ip-add-form {
+        gap: 20px;
         margin-bottom: 20px;
-        padding-bottom: 20px;
-        border-bottom: 1px solid #eee;
+        flex-direction: column;
     }
 
     .ip-input-group {
@@ -269,6 +363,7 @@ function presslearn_protection_admin_scripts() {
         
         const openAllowedBtn = document.getElementById('open-allowed-ip-editor');
         const openBlockedBtn = document.getElementById('open-blocked-ip-editor');
+        const openBlockedCountriesBtn = document.getElementById('open-blocked-countries-editor');
         
         if (openAllowedBtn) {
             openAllowedBtn.addEventListener('click', function() {
@@ -281,6 +376,13 @@ function presslearn_protection_admin_scripts() {
             openBlockedBtn.addEventListener('click', function() {
                 loadBlockedIPs();
                 document.getElementById('blocked-ip-modal').style.display = 'flex';
+            });
+        }
+        
+        if (openBlockedCountriesBtn) {
+            openBlockedCountriesBtn.addEventListener('click', function() {
+                loadBlockedCountries();
+                document.getElementById('blocked-countries-editor').style.display = 'flex';
             });
         }
         
@@ -614,6 +716,252 @@ function presslearn_protection_admin_scripts() {
         function isValidIP(ip) {
             const regex = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
             return regex.test(ip);
+        }
+        
+        // 국가별 차단 관련 코드
+        const countries = [
+            { name: '대한민국', code: 'KR' },
+            { name: '북한', code: 'KP' },
+            { name: '중국', code: 'CN' },
+            { name: '일본', code: 'JP' },
+            { name: '미국', code: 'US' },
+            { name: '러시아', code: 'RU' },
+            { name: '베트남', code: 'VN' },
+            { name: '태국', code: 'TH' },
+            { name: '인도네시아', code: 'ID' },
+            { name: '필리핀', code: 'PH' },
+            { name: '말레이시아', code: 'MY' },
+            { name: '싱가포르', code: 'SG' },
+            { name: '인도', code: 'IN' },
+            { name: '파키스탄', code: 'PK' },
+            { name: '방글라데시', code: 'BD' },
+            { name: '네팔', code: 'NP' },
+            { name: '스리랑카', code: 'LK' },
+            { name: '몽골', code: 'MN' },
+            { name: '대만', code: 'TW' },
+            { name: '홍콩', code: 'HK' },
+            { name: '마카오', code: 'MO' },
+            { name: '캐나다', code: 'CA' },
+            { name: '멕시코', code: 'MX' },
+            { name: '브라질', code: 'BR' },
+            { name: '아르헨티나', code: 'AR' },
+            { name: '칠레', code: 'CL' },
+            { name: '페루', code: 'PE' },
+            { name: '콜롬비아', code: 'CO' },
+            { name: '베네수엘라', code: 'VE' },
+            { name: '영국', code: 'GB' },
+            { name: '프랑스', code: 'FR' },
+            { name: '독일', code: 'DE' },
+            { name: '이탈리아', code: 'IT' },
+            { name: '스페인', code: 'ES' },
+            { name: '네덜란드', code: 'NL' },
+            { name: '벨기에', code: 'BE' },
+            { name: '스위스', code: 'CH' },
+            { name: '스웨덴', code: 'SE' },
+            { name: '노르웨이', code: 'NO' },
+            { name: '덴마크', code: 'DK' },
+            { name: '핀란드', code: 'FI' },
+            { name: '폴란드', code: 'PL' },
+            { name: '체코', code: 'CZ' },
+            { name: '헝가리', code: 'HU' },
+            { name: '루마니아', code: 'RO' },
+            { name: '불가리아', code: 'BG' },
+            { name: '그리스', code: 'GR' },
+            { name: '터키', code: 'TR' },
+            { name: '우크라이나', code: 'UA' },
+            { name: '벨라루스', code: 'BY' },
+            { name: '카자흐스탄', code: 'KZ' },
+            { name: '우즈베키스탄', code: 'UZ' },
+            { name: '이란', code: 'IR' },
+            { name: '이라크', code: 'IQ' },
+            { name: '사우디아라비아', code: 'SA' },
+            { name: '아랍에미리트', code: 'AE' },
+            { name: '이스라엘', code: 'IL' },
+            { name: '이집트', code: 'EG' },
+            { name: '남아프리카', code: 'ZA' },
+            { name: '나이지리아', code: 'NG' },
+            { name: '케냐', code: 'KE' },
+            { name: '에티오피아', code: 'ET' },
+            { name: '가나', code: 'GH' },
+            { name: '모로코', code: 'MA' },
+            { name: '알제리', code: 'DZ' },
+            { name: '튀니지', code: 'TN' },
+            { name: '호주', code: 'AU' },
+            { name: '뉴질랜드', code: 'NZ' },
+            { name: '피지', code: 'FJ' }
+        ];
+        
+        let blockedCountries = [];
+        let activeAutocompleteIndex = -1;
+        
+        const countryInput = document.getElementById('blocked-country-input');
+        const countryAutocomplete = document.getElementById('country-autocomplete');
+        const countryTagsContainer = document.getElementById('blocked-countries-tags');
+        const saveBlockedCountriesBtn = document.getElementById('save-blocked-countries');
+        const closeCountriesModalBtn = document.getElementById('close-blocked-countries-modal');
+        const blockedCountriesModal = document.getElementById('blocked-countries-editor');
+        
+        if (closeCountriesModalBtn) {
+            closeCountriesModalBtn.addEventListener('click', function() {
+                blockedCountriesModal.style.display = 'none';
+            });
+        }
+        
+        if (blockedCountriesModal) {
+            blockedCountriesModal.addEventListener('click', function(e) {
+                if (e.target === blockedCountriesModal || e.target.classList.contains('presslearn-modal-close')) {
+                    blockedCountriesModal.style.display = 'none';
+                }
+            });
+        }
+        
+        function loadBlockedCountries() {
+            fetch(ajaxUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    action: 'presslearn_get_blocked_countries',
+                    nonce: ipNonce
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.data.countries) {
+                    blockedCountries = data.data.countries;
+                    renderCountryTags();
+                }
+            });
+        }
+        
+        function renderCountryTags() {
+            countryTagsContainer.innerHTML = '';
+            blockedCountries.forEach(country => {
+                const tag = document.createElement('span');
+                tag.className = 'country-tag';
+                tag.innerHTML = 
+                    country.name +
+                    '<span class=\"country-code\">' + country.code + '</span>' +
+                    '<span class=\"remove-country\" data-code=\"' + country.code + '\">×</span>';
+                countryTagsContainer.appendChild(tag);
+            });
+        }
+        
+        function showAutocomplete(searchTerm) {
+            const filtered = countries.filter(country => 
+                country.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                country.code.toLowerCase().includes(searchTerm.toLowerCase())
+            ).filter(country => 
+                !blockedCountries.some(blocked => blocked.code === country.code)
+            );
+            
+            countryAutocomplete.innerHTML = '';
+            activeAutocompleteIndex = -1;
+            
+            if (filtered.length > 0 && searchTerm.length > 0) {
+                countryAutocomplete.style.display = 'block';
+                filtered.forEach((country, index) => {
+                    const item = document.createElement('div');
+                    item.className = 'country-autocomplete-item';
+                    item.setAttribute('data-index', index);
+                    item.innerHTML = 
+                        '<span class=\"country-name\">' + country.name + '</span>' +
+                        '<span class=\"country-code-badge\">' + country.code + '</span>';
+                    item.addEventListener('click', () => selectCountry(country));
+                    countryAutocomplete.appendChild(item);
+                });
+            } else {
+                countryAutocomplete.style.display = 'none';
+            }
+        }
+        
+        function selectCountry(country) {
+            if (!blockedCountries.some(blocked => blocked.code === country.code)) {
+                blockedCountries.push(country);
+                renderCountryTags();
+                countryInput.value = '';
+                countryAutocomplete.style.display = 'none';
+            }
+        }
+        
+        if (countryInput) {
+            countryInput.addEventListener('input', (e) => {
+                showAutocomplete(e.target.value);
+            });
+            
+            countryInput.addEventListener('keydown', (e) => {
+                const items = countryAutocomplete.querySelectorAll('.country-autocomplete-item');
+                
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    activeAutocompleteIndex = Math.min(activeAutocompleteIndex + 1, items.length - 1);
+                    updateActiveItem(items);
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    activeAutocompleteIndex = Math.max(activeAutocompleteIndex - 1, -1);
+                    updateActiveItem(items);
+                } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (activeAutocompleteIndex >= 0 && items[activeAutocompleteIndex]) {
+                        items[activeAutocompleteIndex].click();
+                    }
+                } else if (e.key === 'Escape') {
+                    countryAutocomplete.style.display = 'none';
+                    activeAutocompleteIndex = -1;
+                }
+            });
+            
+            countryInput.addEventListener('blur', () => {
+                setTimeout(() => {
+                    countryAutocomplete.style.display = 'none';
+                }, 200);
+            });
+        }
+        
+        function updateActiveItem(items) {
+            items.forEach((item, index) => {
+                if (index === activeAutocompleteIndex) {
+                    item.classList.add('active');
+                } else {
+                    item.classList.remove('active');
+                }
+            });
+        }
+        
+        if (countryTagsContainer) {
+            countryTagsContainer.addEventListener('click', (e) => {
+                if (e.target.classList.contains('remove-country')) {
+                    const code = e.target.getAttribute('data-code');
+                    blockedCountries = blockedCountries.filter(country => country.code !== code);
+                    renderCountryTags();
+                }
+            });
+        }
+        
+        if (saveBlockedCountriesBtn) {
+            saveBlockedCountriesBtn.addEventListener('click', () => {
+                fetch(ajaxUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: new URLSearchParams({
+                        action: 'presslearn_save_blocked_countries',
+                        nonce: ipNonce,
+                        countries: JSON.stringify(blockedCountries)
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('차단 국가 목록이 저장되었습니다.');
+                        blockedCountriesModal.style.display = 'none';
+                    } else {
+                        alert(data.data.message || '저장에 실패했습니다.');
+                    }
+                });
+            });
         }
     });
     ";

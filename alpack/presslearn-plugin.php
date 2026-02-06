@@ -3,7 +3,7 @@
  * Plugin Name: AL Pack - 워드프레스를 위한 통계, 광고 도구
  * Plugin URI: https://alpack.dev
  * Description: 통계, 글쓰기 SEO, 무효 트래픽 차단, 빠른 버튼 생성, 카카오 공유 버튼, 스크롤 팝업, 애드클리커 등 워드프레스를 위한 통합 플러그인
- * Version: 1.2.2
+ * Version: 1.3.1
  * Author: 프레스런
  * Author URI: https://alpack.dev
  * Text Domain: alpack
@@ -185,6 +185,7 @@ function presslearn_plugin_uninstall() {
     delete_option('presslearn_button_transition_enabled');
     delete_option('presslearn_auto_index_enabled');
     delete_option('presslearn_header_footer_enabled');
+    delete_option('presslearn_click_protection_blocked_countries');
     delete_transient('presslearn_plugin_activation_redirect');
     
     $users = get_users(array('fields' => 'ID'));
@@ -1231,6 +1232,39 @@ class PressLearn_Plugin {
         return '';
     }
     
+    public function get_visitor_country_code($ip) {
+        $ip = filter_var($ip, FILTER_VALIDATE_IP);
+        
+        if (empty($ip) || $ip == '127.0.0.1' || $ip == '::1') {
+            return '';
+        }
+        
+        $cache_key = 'presslearn_country_code_' . md5($ip);
+        $cached_code = get_transient($cache_key);
+        if ($cached_code !== false) {
+            return $cached_code;
+        }
+        
+        $api_url = 'http://ip-api.com/json/' . esc_attr($ip) . '?fields=countryCode,status';
+        $response = wp_remote_get($api_url, array(
+            'timeout' => 5,
+            'headers' => array(
+                'Accept' => 'application/json'
+            )
+        ));
+        
+        if (!is_wp_error($response) && wp_remote_retrieve_response_code($response) === 200) {
+            $data = json_decode(wp_remote_retrieve_body($response), true);
+            if (isset($data['countryCode']) && $data['status'] === 'success') {
+                $country_code = sanitize_text_field($data['countryCode']);
+                set_transient($cache_key, $country_code, 86400);
+                return $country_code;
+            }
+        }
+        
+        return '';
+    }
+    
     public function register_tracking_ajax() {
         add_action('wp_ajax_presslearn_track_pageview', array($this, 'track_pageview'));
         add_action('wp_ajax_nopriv_presslearn_track_pageview', array($this, 'track_pageview'));
@@ -1586,6 +1620,48 @@ function presslearn_plugin() {
 
 presslearn_plugin();
 
+add_action('init', 'presslearn_check_country_access_block', 1);
+
+function presslearn_check_country_access_block() {
+    if (is_admin()) {
+        return;
+    }
+    
+    $click_protection_enabled = get_option('presslearn_click_protection_enabled', 'no');
+    if ($click_protection_enabled !== 'yes') {
+        return;
+    }
+    
+    $blocked_countries = get_option('presslearn_click_protection_blocked_countries', array());
+    if (empty($blocked_countries)) {
+        return;
+    }
+    
+    $user_ip = presslearn_plugin()->get_visitor_ip_for_protection();
+    
+    $user_country_code = presslearn_plugin()->get_visitor_country_code($user_ip);
+    
+    $is_blocked = false;
+    foreach ($blocked_countries as $country) {
+        if (isset($country['code']) && $country['code'] === $user_country_code) {
+            $is_blocked = true;
+            break;
+        }
+    }
+    
+    if ($is_blocked) {
+        while (ob_get_level()) {
+            ob_end_clean();
+        }
+        
+        header('HTTP/1.1 403 Forbidden');
+        header('Content-Type: text/html; charset=UTF-8');
+        
+        echo '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Access Denied</title></head><body></body></html>';
+        exit;
+    }
+}
+
 add_action('wp_ajax_presslearn_get_allowed_ips', 'presslearn_get_allowed_ips');
 add_action('wp_ajax_presslearn_add_allowed_ip', 'presslearn_add_allowed_ip');
 add_action('wp_ajax_presslearn_delete_allowed_ip', 'presslearn_delete_allowed_ip');
@@ -1593,6 +1669,57 @@ add_action('wp_ajax_presslearn_get_blocked_ips', 'presslearn_get_blocked_ips');
 add_action('wp_ajax_presslearn_add_blocked_ip', 'presslearn_add_blocked_ip');
 add_action('wp_ajax_presslearn_delete_blocked_ip', 'presslearn_delete_blocked_ip');
 add_action('wp_ajax_presslearn_delete_analytics_data', 'presslearn_delete_analytics_data');
+add_action('wp_ajax_presslearn_get_blocked_countries', 'presslearn_get_blocked_countries');
+add_action('wp_ajax_presslearn_save_blocked_countries', 'presslearn_save_blocked_countries');
+
+function presslearn_get_blocked_countries() {
+    check_ajax_referer('presslearn_ip_nonce', 'nonce');
+    
+    if (current_user_can('manage_options')) {
+        $blocked_countries = get_option('presslearn_click_protection_blocked_countries', array());
+        
+        wp_send_json_success(array(
+            'countries' => $blocked_countries
+        ));
+    }
+    
+    wp_send_json_error(array('message' => '권한이 없습니다.'));
+    wp_die();
+}
+
+function presslearn_save_blocked_countries() {
+    check_ajax_referer('presslearn_ip_nonce', 'nonce');
+    
+    if (current_user_can('manage_options')) {
+        $countries_json = isset($_POST['countries']) ? wp_unslash($_POST['countries']) : '[]';
+        $countries = json_decode($countries_json, true);
+        
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            wp_send_json_error(array('message' => '잘못된 데이터 형식입니다.'));
+            wp_die();
+        }
+        
+        $valid_countries = array();
+        foreach ($countries as $country) {
+            if (isset($country['code']) && isset($country['name'])) {
+                $valid_countries[] = array(
+                    'code' => sanitize_text_field($country['code']),
+                    'name' => sanitize_text_field($country['name'])
+                );
+            }
+        }
+        
+        update_option('presslearn_click_protection_blocked_countries', $valid_countries);
+        
+        wp_send_json_success(array(
+            'message' => '차단 국가 목록이 저장되었습니다.',
+            'countries' => $valid_countries
+        ));
+    }
+    
+    wp_send_json_error(array('message' => '권한이 없습니다.'));
+    wp_die();
+}
 
 function presslearn_get_allowed_ips() {
     check_ajax_referer('presslearn_ip_nonce', 'nonce');
@@ -4548,6 +4675,232 @@ add_action('wp_head', 'presslearn_output_header_code', 999);
 add_action('wp_body_open', 'presslearn_output_body_open_code');
 add_action('wp_footer', 'presslearn_output_before_closing_body_code', 1);
 add_action('wp_footer', 'presslearn_output_footer_code', 999);
+
+add_action('wp_dashboard_setup', 'presslearn_add_dashboard_widget');
+
+function presslearn_add_dashboard_widget() {
+    $is_activated = presslearn_plugin()->is_plugin_activated();
+    $analytics_enabled = get_option('presslearn_analytics_enabled', 'no');
+    
+    if ($is_activated && $analytics_enabled === 'yes') {
+        wp_add_dashboard_widget(
+            'presslearn_analytics_highlight',
+            '씬 애널리틱스 하이라이트',
+            'presslearn_render_dashboard_widget'
+        );
+        
+        global $wp_meta_boxes;
+        $normal_dashboard = $wp_meta_boxes['dashboard']['normal']['core'];
+        $widget_backup = array('presslearn_analytics_highlight' => $normal_dashboard['presslearn_analytics_highlight']);
+        unset($normal_dashboard['presslearn_analytics_highlight']);
+        $sorted_dashboard = array_merge($widget_backup, $normal_dashboard);
+        $wp_meta_boxes['dashboard']['normal']['core'] = $sorted_dashboard;
+    }
+}
+
+function presslearn_render_dashboard_widget() {
+    global $wpdb;
+    $table_pageviews = $wpdb->prefix . 'presslearn_pageviews';
+    
+    $stats = [
+        'pageviews' => 0,
+        'visitors' => 0,
+        'ip_visitors' => 0,
+        'prev_pageviews' => 0,
+        'prev_visitors' => 0,
+        'prev_ip_visitors' => 0
+    ];
+    
+    if($wpdb->get_var("SHOW TABLES LIKE '$table_pageviews'") == $table_pageviews) {
+        $current_week_condition = "WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)";
+        
+        $pageviews = $wpdb->get_var("
+            SELECT COUNT(*) 
+            FROM $table_pageviews 
+            $current_week_condition
+        ");
+        
+        $visitors = $wpdb->get_var("
+            SELECT COUNT(DISTINCT visitor_id) 
+            FROM $table_pageviews 
+            $current_week_condition
+        ");
+        
+        $ip_visitors = $wpdb->get_var("
+            SELECT COUNT(DISTINCT ip) 
+            FROM $table_pageviews 
+            $current_week_condition
+        ");
+        
+        $prev_week_condition = "WHERE created_at BETWEEN DATE_SUB(CURDATE(), INTERVAL 14 DAY) AND DATE_SUB(CURDATE(), INTERVAL 8 DAY)";
+        
+        $prev_pageviews = $wpdb->get_var("
+            SELECT COUNT(*) 
+            FROM $table_pageviews 
+            $prev_week_condition
+        ");
+        
+        $prev_visitors = $wpdb->get_var("
+            SELECT COUNT(DISTINCT visitor_id) 
+            FROM $table_pageviews 
+            $prev_week_condition
+        ");
+        
+        $prev_ip_visitors = $wpdb->get_var("
+            SELECT COUNT(DISTINCT ip) 
+            FROM $table_pageviews 
+            $prev_week_condition
+        ");
+        
+        $stats['pageviews'] = $pageviews ? intval($pageviews) : 0;
+        $stats['visitors'] = $visitors ? intval($visitors) : 0;
+        $stats['ip_visitors'] = $ip_visitors ? intval($ip_visitors) : 0;
+        $stats['prev_pageviews'] = $prev_pageviews ? intval($prev_pageviews) : 0;
+        $stats['prev_visitors'] = $prev_visitors ? intval($prev_visitors) : 0;
+        $stats['prev_ip_visitors'] = $prev_ip_visitors ? intval($prev_ip_visitors) : 0;
+    }
+    
+    function presslearn_calculate_change($current, $previous) {
+        if ($previous == 0) {
+            return [
+                'percentage' => 0,
+                'show' => false
+            ];
+        }
+        
+        $change = $current - $previous;
+        $percentage = round(($change / $previous) * 100);
+        
+        return [
+            'change' => $change,
+            'percentage' => $percentage,
+            'show' => true,
+            'is_increase' => $change > 0
+        ];
+    }
+    
+    $pageviews_change = presslearn_calculate_change($stats['pageviews'], $stats['prev_pageviews']);
+    $visitors_change = presslearn_calculate_change($stats['visitors'], $stats['prev_visitors']);
+    $ip_visitors_change = presslearn_calculate_change($stats['ip_visitors'], $stats['prev_ip_visitors']);
+    
+    ?>
+    <style>
+        .pl-dashboard-widget {
+            margin: -10px -12px;
+        }
+        .pl-widget-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 15px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .pl-widget-period {
+            color: #666;
+            font-size: 12px;
+            font-weight: normal;
+        }
+        .pl-widget-stats {
+            padding: 15px;
+        }
+        .pl-widget-stat {
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .pl-widget-stat:last-child {
+            margin-bottom: 0;
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+        .pl-widget-stat-label {
+            color: #666;
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+        .pl-widget-stat-value {
+            font-size: 24px;
+            font-weight: 600;
+            color: #2196F3;
+            margin-bottom: 3px;
+        }
+        .pl-widget-stat-change {
+            font-size: 12px;
+            font-weight: normal;
+        }
+        .pl-widget-stat-change.increase {
+            color: #4caf50;
+        }
+        .pl-widget-stat-change.decrease {
+            color: #ef4444;
+        }
+        .pl-widget-footer {
+            padding: 12px 15px;
+            background: #f8f9fa;
+            border-top: 1px solid #e0e0e0;
+            text-align: center;
+        }
+        .pl-widget-footer a {
+            color: #2271b1;
+            text-decoration: none;
+            font-size: 13px;
+        }
+        .pl-widget-footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+    
+    <div class="pl-dashboard-widget">
+        <div class="pl-widget-header">
+            <h3 style="margin: 0; font-size: 14px; font-weight: 600;">최근 7일 통계</h3>
+            <span class="pl-widget-period">최근 7일</span>
+        </div>
+        
+        <div class="pl-widget-stats">
+            <div class="pl-widget-stat">
+                <div class="pl-widget-stat-label">조회</div>
+                <div class="pl-widget-stat-value"><?php echo esc_html(number_format($stats['pageviews'])); ?></div>
+                <?php if ($pageviews_change['show']): ?>
+                <div class="pl-widget-stat-change <?php echo esc_attr($pageviews_change['is_increase'] ? 'increase' : 'decrease'); ?>">
+                    <?php echo esc_html($pageviews_change['is_increase'] ? '▲' : '▼'); ?> 
+                    <?php echo esc_html(number_format(abs($pageviews_change['change']))); ?>
+                    (<?php echo esc_html(abs($pageviews_change['percentage'])); ?>%)
+                </div>
+                <?php endif; ?>
+            </div>
+            
+            <div class="pl-widget-stat">
+                <div class="pl-widget-stat-label">방문자 (IP 기준)</div>
+                <div class="pl-widget-stat-value"><?php echo esc_html(number_format($stats['ip_visitors'])); ?></div>
+                <?php if ($ip_visitors_change['show']): ?>
+                <div class="pl-widget-stat-change <?php echo esc_attr($ip_visitors_change['is_increase'] ? 'increase' : 'decrease'); ?>">
+                    <?php echo esc_html($ip_visitors_change['is_increase'] ? '▲' : '▼'); ?> 
+                    <?php echo esc_html(number_format(abs($ip_visitors_change['change']))); ?>
+                    (<?php echo esc_html(abs($ip_visitors_change['percentage'])); ?>%)
+                </div>
+                <?php endif; ?>
+            </div>
+            
+            <div class="pl-widget-stat">
+                <div class="pl-widget-stat-label">방문자 (브라우저 기준)</div>
+                <div class="pl-widget-stat-value"><?php echo esc_html(number_format($stats['visitors'])); ?></div>
+                <?php if ($visitors_change['show']): ?>
+                <div class="pl-widget-stat-change <?php echo esc_attr($visitors_change['is_increase'] ? 'increase' : 'decrease'); ?>">
+                    <?php echo esc_html($visitors_change['is_increase'] ? '▲' : '▼'); ?> 
+                    <?php echo esc_html(number_format(abs($visitors_change['change']))); ?>
+                    (<?php echo esc_html(abs($visitors_change['percentage'])); ?>%)
+                </div>
+                <?php endif; ?>
+            </div>
+        </div>
+        
+        <div class="pl-widget-footer">
+            <a href="<?php echo esc_url(admin_url('admin.php?page=presslearn-analytics&tab=statistics')); ?>">전체 통계 보기 →</a>
+        </div>
+    </div>
+    <?php
+}
 
 /**
  * Output header code in <head> section

@@ -331,6 +331,7 @@ $robots_file_exists = !empty($robots_existing_content);
                             placeholder="User-agent: *&#10;Disallow: /wp-admin/&#10;Allow: /wp-admin/admin-ajax.php"
                             <?php echo !$filesystem_initialized ? 'disabled' : ''; ?>
                         ><?php echo esc_textarea($robots_existing_content); ?></textarea>
+                        <button type="button" class="point-btn" id="set-default-robots" style="margin-top: 10px;">기본 값 설정</button>
                     </div>
                 </div>
 
@@ -392,4 +393,19 @@ $robots_file_exists = !empty($robots_existing_content);
             </div>
         </div>
     </div>
-</div> 
+</div>
+
+<script>
+jQuery(document).ready(function($) {
+    $('#set-default-robots').on('click', function(e) {
+        e.preventDefault();
+        
+        var defaultContent = 'User-agent: *\n\n';
+        defaultContent += 'Disallow: /wp-admin/\n';
+        defaultContent += 'Allow: /wp-admin/admin-ajax.php\n\n';
+        defaultContent += 'Sitemap: <?php echo esc_js(home_url('/sitemap_index.xml')); ?>';
+        
+        $('#robots_txt_content').val(defaultContent);
+    });
+});
+</script> 

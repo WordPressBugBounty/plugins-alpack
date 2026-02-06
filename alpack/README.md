@@ -4,7 +4,7 @@ Tags: 통계, 애드클리커, 소셜 공유, 무효 트래픽 클릭 차단, �
 Requires at least: 5.0
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 1.2.2
+Stable tag: 1.3.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -79,6 +79,17 @@ AL Pack 플러그인 공지사항 및 배너 송출을 위해 [프레스런](htt
 문제가 발생하거나 추가 지원이 필요한 경우 [AL Pack 디스커션 페이지](https://alpack.dev)를 방문하거나 [이메일](info@loword.co.kr)로 문의해 주세요. 
 
 == Changelog ==
+= 1.3.1 =
+* 빠른 버튼 프리셋 기능 및 렌더링 버그 해결
+* 기타 잡 마이너 버그 해결
+* 주말 특근
+
+= 1.3.0 =
+* 빠른 버튼 프리셋 기능 추가 및 커스터마이즈 옵션 추가
+* 씬 애널리틱스 하이라이트 관리자 대시보드 위젯 추가
+* Ads 매니저 기본 값 설정 버튼 추가
+* 애드프로텍터 국가별 사이트 접근 차단 기능 추가
+
 = 1.2.2 =
 * 메인 설정 내 Alpack Discussion 공지사항 영역 추가
 * 애드 프로텍터의 Timeout 설정 옵션 추가

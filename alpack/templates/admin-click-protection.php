@@ -205,6 +205,15 @@ $modal_button_text = get_option('presslearn_modal_button_text', '확인');
                 
                 <div class="presslearn-card-body-row">
                     <div class="presslearn-card-body-row-item grid-left">
+                        <h3>차단 국가 설정</h3>
+                    </div>
+                    <div class="presslearn-card-body-row-item grid-right">
+                        <button type="button" id="open-blocked-countries-editor" class="point-btn">설정하기</button>
+                    </div>
+                </div>
+                
+                <div class="presslearn-card-body-row">
+                    <div class="presslearn-card-body-row-item grid-left">
                         <h3>차단 IP 해제 주기(일)</h3>
                     </div>
                     <div class="presslearn-card-body-row-item grid-right">
@@ -320,6 +329,29 @@ $modal_button_text = get_option('presslearn_modal_button_text', '확인');
         </div>
         <div class="presslearn-modal-footer">
             <button type="button" id="close-blocked-modal-button" class="secondary-btn">닫기</button>
+        </div>
+    </div>
+</div>
+
+<div id="blocked-countries-editor" class="presslearn-modal" style="display: none;">
+    <div class="presslearn-modal-content">
+        <div class="presslearn-modal-header">
+            <h3>차단 국가 관리</h3>
+            <span class="presslearn-modal-close">&times;</span>
+        </div>
+        <div class="presslearn-modal-body">
+            <div class="ip-add-form" style="display: flex; align-items: center; margin-bottom: 20px;">
+                <div class="country-tag-container" id="blocked-countries-tags"></div>
+                <input type="text" id="blocked-country-input" placeholder="국가를 검색하세요..." class="regular-text" style="flex: 1;">
+                <div id="country-autocomplete" class="country-autocomplete"></div>
+            </div>
+            <p style="margin-top: 10px; color: #666;">
+                <small>차단할 국가를 검색하여 선택하세요. 선택된 국가에서의 모든 접속이 차단됩니다.</small>
+            </p>
+        </div>
+        <div class="presslearn-modal-footer">
+            <button type="button" id="save-blocked-countries" class="point-btn">저장하기</button>
+            <button type="button" id="close-blocked-countries-modal" class="secondary-btn">닫기</button>
         </div>
     </div>
 </div>

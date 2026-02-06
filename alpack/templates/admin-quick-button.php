@@ -52,6 +52,7 @@ if (isset($_POST['save_quick_button_settings'])) {
 
 $quick_button_enabled = get_option('presslearn_quick_button_enabled', 'no');
 $button_transition_enabled = get_option('presslearn_button_transition_enabled', 'no');
+$saved_preset = get_option('presslearn_button_preset', array());
 
 ?>
 <div class="presslearn-header">
@@ -124,6 +125,19 @@ $button_transition_enabled = get_option('presslearn_button_transition_enabled', 
                         </select>
                     </div>
                 </div>
+                <div class="presslearn-card-body-row">
+                    <div class="presslearn-card-body-row-item grid-left">
+                        <h3>버튼 프리셋 초기화</h3>
+                    </div>
+                    <div class="presslearn-card-body-row-item grid-right">
+                        <button type="button" id="reset-preset-button" class="point-btn" <?php echo empty($saved_preset) ? 'disabled' : ''; ?>>
+                            프리셋 초기화
+                        </button>
+                        <?php if (empty($saved_preset)): ?>
+                        <p style="margin-top: 10px; color: #666; font-size: 13px;">저장된 프리셋이 없습니다.</p>
+                        <?php endif; ?>
+                    </div>
+                </div>
             </form>
         </div>
         <div class="presslearn-card-footer">
@@ -137,4 +151,30 @@ $button_transition_enabled = get_option('presslearn_button_transition_enabled', 
     </div>
 </div>
 
-
+<script type="text/javascript">
+jQuery(document).ready(function($) {
+    $('#reset-preset-button').on('click', function() {
+        if (confirm('저장된 버튼 프리셋을 초기화하시겠습니까?')) {
+            $.ajax({
+                url: ajaxurl,
+                type: 'POST',
+                data: {
+                    action: 'presslearn_delete_button_preset',
+                    nonce: '<?php echo wp_create_nonce('presslearn_button_preset'); ?>'
+                },
+                success: function(response) {
+                    if (response.success) {
+                        alert('프리셋이 초기화되었습니다.');
+                        location.reload();
+                    } else {
+                        alert('프리셋 초기화에 실패했습니다.');
+                    }
+                },
+                error: function() {
+                    alert('프리셋 초기화 중 오류가 발생했습니다.');
+                }
+            });
+        }
+    });
+});
+</script>

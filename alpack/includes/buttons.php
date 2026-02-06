@@ -31,6 +31,9 @@ function presslearn_register_quick_button_block() {
     
     $button_transition_enabled = get_option('presslearn_button_transition_enabled', 'no');
     
+    $saved_preset = get_option('presslearn_button_preset', array());
+    $saved_preset_json = !empty($saved_preset) ? wp_json_encode($saved_preset) : 'null';
+    
     wp_add_inline_script('presslearn-quick-button-block', '
         (function(blocks, element, components, editor) {
             var el = element.createElement;
@@ -51,56 +54,154 @@ function presslearn_register_quick_button_block() {
             
             var infiniteAnimationEnabled = "' . esc_js($button_transition_enabled === 'yes' ? 'yes' : 'no') . '";
             
+            var savedPreset = ' . $saved_preset_json . ';
+            var presslearn_ajax = {
+                ajaxurl: "' . esc_js(admin_url('admin-ajax.php')) . '",
+                nonce: "' . esc_js(wp_create_nonce('presslearn_button_preset')) . '"
+            };
+            
+            var defaultValues = {
+                buttonText: "버튼 텍스트",
+                buttonUrl: "#",
+                buttonColor: savedPreset && savedPreset.buttonColor ? savedPreset.buttonColor : "#2196F3",
+                buttonTextColor: savedPreset && savedPreset.buttonTextColor ? savedPreset.buttonTextColor : "#ffffff",
+                buttonHoverColor: savedPreset && savedPreset.buttonHoverColor ? savedPreset.buttonHoverColor : "",
+                buttonPosition: savedPreset && savedPreset.buttonPosition ? savedPreset.buttonPosition : "center",
+                buttonSize: savedPreset && savedPreset.buttonSize ? savedPreset.buttonSize : "medium",
+                buttonWidth: savedPreset && savedPreset.buttonWidth ? savedPreset.buttonWidth : "default",
+                openInNewTab: false,
+                buttonAnimation: savedPreset && savedPreset.buttonAnimation ? savedPreset.buttonAnimation : "none",
+                infiniteAnimation: infiniteAnimationEnabled,
+                borderRadius: savedPreset && savedPreset.borderRadius ? savedPreset.borderRadius : 4
+            };
+            
             blocks.registerBlockType("presslearn/quick-button", {
                 title: "PL 빠른 버튼",
                 icon: buttonIcon,
                 category: "presslearn",
                 keywords: ["버튼", "button", "link", "presslearn"],
                 description: "클릭 가능한 버튼을 추가합니다. 텍스트, URL, 색상 및 정렬을 사용자 정의할 수 있습니다.",
+                deprecated: [{
+                    attributes: {
+                        buttonText: { type: "string", default: "버튼 텍스트" },
+                        buttonUrl: { type: "string", default: "#" },
+                        buttonColor: { type: "string", default: "#2196F3" },
+                        buttonTextColor: { type: "string", default: "#ffffff" },
+                        buttonHoverColor: { type: "string", default: "" },
+                        buttonPosition: { type: "string", default: "center" },
+                        buttonSize: { type: "string", default: "medium" },
+                        buttonWidth: { type: "string", default: "default" },
+                        openInNewTab: { type: "boolean", default: false },
+                        buttonAnimation: { type: "string", default: "none" },
+                        infiniteAnimation: { type: "string", default: "yes" },
+                        borderRadius: { type: "number", default: 4 }
+                    },
+                    save: function(props) {
+                        var attributes = props.attributes;
+                        var buttonPadding = "12px 24px";
+                        switch(attributes.buttonSize) {
+                            case "small": buttonPadding = "8px 16px"; break;
+                            case "large": buttonPadding = "16px 32px"; break;
+                            case "xlarge": buttonPadding = "20px 40px"; break;
+                        }
+                        var fontSize = "15px";
+                        switch(attributes.buttonSize) {
+                            case "small": fontSize = "13px"; break;
+                            case "large": fontSize = "18px"; break;
+                            case "xlarge": fontSize = "22px"; break;
+                        }
+                        var buttonWidth = "auto";
+                        var textAlign = "inherit";
+                        if (attributes.buttonWidth === "half") {
+                            buttonWidth = "50%";
+                            textAlign = "center";
+                        } else if (attributes.buttonWidth === "full") {
+                            buttonWidth = "100%";
+                            textAlign = "center";
+                        }
+                        var containerAlignment = attributes.buttonPosition;
+                        if (attributes.buttonWidth === "full") {
+                            containerAlignment = "center";
+                        }
+                        var animationClass = "presslearn-button presslearn-button-animation-" + attributes.buttonAnimation;
+                        if (infiniteAnimationEnabled === "yes" && attributes.buttonAnimation !== "none") {
+                            animationClass += " presslearn-button-animation-infinite";
+                        }
+                        return el("div", { 
+                            className: "presslearn-button-container",
+                            style: { textAlign: containerAlignment, margin: "20px 0" }
+                        },
+                            el("a", {
+                                className: animationClass,
+                                href: attributes.buttonUrl || "#",
+                                ...(attributes.openInNewTab ? { target: "_blank", rel: "noopener noreferrer" } : {}),
+                                style: {
+                                    display: "inline-block",
+                                    padding: buttonPadding,
+                                    backgroundColor: attributes.buttonColor,
+                                    color: attributes.buttonTextColor,
+                                    textDecoration: "none",
+                                    borderRadius: attributes.borderRadius + "px",
+                                    fontWeight: "bold",
+                                    fontSize: fontSize,
+                                    width: buttonWidth,
+                                    textAlign: textAlign,
+                                    boxSizing: "border-box",
+                                    transition: "all 0.3s ease-in-out"
+                                },
+                                "data-hover-color": attributes.buttonHoverColor || attributes.buttonColor
+                            }, attributes.buttonText || "버튼 텍스트")
+                        );
+                    }
+                }],
                 attributes: {
                     buttonText: {
                         type: "string",
-                        default: "버튼 텍스트"
+                        default: defaultValues.buttonText
                     },
                     buttonUrl: {
                         type: "string",
-                        default: "#"
+                        default: defaultValues.buttonUrl
                     },
                     buttonColor: {
                         type: "string",
-                        default: "#2196F3"
+                        default: defaultValues.buttonColor
                     },
                     buttonTextColor: {
                         type: "string",
-                        default: "#ffffff"
+                        default: defaultValues.buttonTextColor
                     },
                     buttonHoverColor: {
                         type: "string",
-                        default: ""
+                        default: defaultValues.buttonHoverColor
                     },
                     buttonPosition: {
                         type: "string",
-                        default: "center"
+                        default: defaultValues.buttonPosition
                     },
                     buttonSize: {
                         type: "string",
-                        default: "medium"
+                        default: defaultValues.buttonSize
                     },
                     buttonWidth: {
                         type: "string",
-                        default: "default"
+                        default: defaultValues.buttonWidth
                     },
                     openInNewTab: {
                         type: "boolean",
-                        default: false
+                        default: defaultValues.openInNewTab
                     },
                     buttonAnimation: {
                         type: "string",
-                        default: "none"
+                        default: defaultValues.buttonAnimation
                     },
                     infiniteAnimation: {
                         type: "string",
-                        default: infiniteAnimationEnabled
+                        default: defaultValues.infiniteAnimation
+                    },
+                    borderRadius: {
+                        type: "number",
+                        default: defaultValues.borderRadius
                     }
                 },
                 example: {
@@ -151,6 +252,92 @@ function presslearn_register_quick_button_block() {
                     
                     function onChangeAnimation(newAnimation) {
                         props.setAttributes({ buttonAnimation: newAnimation });
+                    }
+                    
+                    function onChangeBorderRadius(newRadius) {
+                        props.setAttributes({ borderRadius: newRadius });
+                    }
+                    
+                    function savePreset() {
+                        var presetData = {
+                            buttonColor: attributes.buttonColor,
+                            buttonTextColor: attributes.buttonTextColor,
+                            buttonHoverColor: attributes.buttonHoverColor,
+                            buttonPosition: attributes.buttonPosition,
+                            buttonSize: attributes.buttonSize,
+                            buttonWidth: attributes.buttonWidth,
+                            buttonAnimation: attributes.buttonAnimation,
+                            borderRadius: attributes.borderRadius
+                        };
+                        
+                        wp.ajax.post(\'presslearn_save_button_preset\', {
+                            preset: JSON.stringify(presetData),
+                            nonce: presslearn_ajax.nonce
+                        }).done(function(response) {
+                            savedPreset = presetData;
+                            window.presslearnButtonPreset = presetData;
+                            
+                            defaultValues.buttonColor = presetData.buttonColor;
+                            defaultValues.buttonTextColor = presetData.buttonTextColor;
+                            defaultValues.buttonHoverColor = presetData.buttonHoverColor;
+                            defaultValues.buttonPosition = presetData.buttonPosition;
+                            defaultValues.buttonSize = presetData.buttonSize;
+                            defaultValues.buttonWidth = presetData.buttonWidth;
+                            defaultValues.buttonAnimation = presetData.buttonAnimation;
+                            defaultValues.borderRadius = presetData.borderRadius;
+                            
+                            var blockType = blocks.getBlockType(\'presslearn/quick-button\');
+                            if (blockType && blockType.attributes) {
+                                blockType.attributes.buttonColor.default = presetData.buttonColor;
+                                blockType.attributes.buttonTextColor.default = presetData.buttonTextColor;
+                                blockType.attributes.buttonHoverColor.default = presetData.buttonHoverColor;
+                                blockType.attributes.buttonPosition.default = presetData.buttonPosition;
+                                blockType.attributes.buttonSize.default = presetData.buttonSize;
+                                blockType.attributes.buttonWidth.default = presetData.buttonWidth;
+                                blockType.attributes.buttonAnimation.default = presetData.buttonAnimation;
+                                blockType.attributes.borderRadius.default = presetData.borderRadius;
+                            }
+                            
+                            alert(\'프리셋이 저장되었습니다. 새로운 버튼에 적용됩니다.\');
+                        }).fail(function(error) {
+                            alert(\'프리셋 저장에 실패했습니다.\');
+                        });
+                    }
+                    
+                    function deletePreset() {
+                        if (confirm(\'저장된 프리셋을 삭제하시겠습니까?\')) {
+                            wp.ajax.post(\'presslearn_delete_button_preset\', {
+                                nonce: presslearn_ajax.nonce
+                            }).done(function(response) {
+                                savedPreset = null;
+                                window.presslearnButtonPreset = null;
+                                
+                                defaultValues.buttonColor = "#2196F3";
+                                defaultValues.buttonTextColor = "#ffffff";
+                                defaultValues.buttonHoverColor = "";
+                                defaultValues.buttonPosition = "center";
+                                defaultValues.buttonSize = "medium";
+                                defaultValues.buttonWidth = "default";
+                                defaultValues.buttonAnimation = "none";
+                                defaultValues.borderRadius = 4;
+                                
+                                var blockType = blocks.getBlockType(\'presslearn/quick-button\');
+                                if (blockType && blockType.attributes) {
+                                    blockType.attributes.buttonColor.default = "#2196F3";
+                                    blockType.attributes.buttonTextColor.default = "#ffffff";
+                                    blockType.attributes.buttonHoverColor.default = "";
+                                    blockType.attributes.buttonPosition.default = "center";
+                                    blockType.attributes.buttonSize.default = "medium";
+                                    blockType.attributes.buttonWidth.default = "default";
+                                    blockType.attributes.buttonAnimation.default = "none";
+                                    blockType.attributes.borderRadius.default = 4;
+                                }
+                                
+                                alert(\'프리셋이 삭제되었습니다. 새로운 버튼은 기본값으로 생성됩니다.\');
+                            }).fail(function(error) {
+                                alert(\'프리셋 삭제에 실패했습니다.\');
+                            });
+                        }
                     }
                     
                     var buttonPadding;
@@ -313,6 +500,54 @@ function presslearn_register_quick_button_block() {
                                         ],
                                         onChange: onChangeAnimation
                                     })
+                                ),
+                                el(PanelRow, {},
+                                    el("div", { className: "components-base-control", style: { width: "100%" } },
+                                        el("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" } },
+                                            el("label", { 
+                                                className: "components-base-control__label", 
+                                                style: { margin: 0, fontWeight: "regular",fontSize: "11px", flex: "0 0 80%" } 
+                                            }, "모서리 둥글기"),
+                                            el("span", { 
+                                                style: { 
+                                                    flex: "0 0 20%", 
+                                                    textAlign: "right", 
+                                                    fontWeight: "regular",
+                                                    color: "#8b95a1"
+                                                } 
+                                            }, attributes.borderRadius + "px")
+                                        ),
+                                        el(components.RangeControl, {
+                                            value: attributes.borderRadius,
+                                            onChange: onChangeBorderRadius,
+                                            min: 0,
+                                            max: 50,
+                                            step: 1,
+                                            withInputField: false,
+                                            style: { marginTop: "4px" }
+                                        })
+                                    )
+                                )
+                            ),
+                            el(PanelBody, { title: "프리셋", initialOpen: false },
+                                savedPreset ? el(PanelRow, {},
+                                    el("div", { style: { width: "100%" } },
+                                        el("p", { style: { marginTop: 0, marginBottom: "10px", color: "#666" } }, "프리셋이 적용된 버튼입니다.")
+                                    )
+                                ) : null,
+                                el(PanelRow, {},
+                                    el(components.ButtonGroup, { style: { display: "flex" , width: "100%" , justifyContent: "space-between" , flexDirection: "column" , gap: "10px" , boxSizing: "border-box" } },
+                                        el(components.Button, {
+                                            isPrimary: true,
+                                            onClick: savePreset,
+                                            style: { flex: 1 , boxSizing: "border-box" , outline: "none" , boxShadow: "none" }
+                                        }, "현재 프리셋 저장"),
+                                        savedPreset ? el(components.Button, {
+                                            isSecondary: true,
+                                            onClick: deletePreset,
+                                            style: { flex: 1 , boxSizing: "border-box" , outline: "none" , boxShadow: "none" , border: "1px solid #e1e4e8"}
+                                        }, "프리셋 삭제") : null
+                                    )
                                 )
                             )
                         ),
@@ -330,7 +565,7 @@ function presslearn_register_quick_button_block() {
                                         backgroundColor: attributes.buttonColor,
                                         color: attributes.buttonTextColor,
                                         textDecoration: "none",
-                                        borderRadius: "4px",
+                                        borderRadius: attributes.borderRadius + "px",
                                         fontWeight: "bold",
                                         fontSize: fontSize,
                                         width: buttonWidth,
@@ -412,7 +647,7 @@ function presslearn_register_quick_button_block() {
                                 backgroundColor: attributes.buttonColor,
                                 color: attributes.buttonTextColor,
                                 textDecoration: "none",
-                                borderRadius: "4px",
+                                borderRadius: attributes.borderRadius + "px",
                                 fontWeight: "bold",
                                 fontSize: fontSize,
                                 width: buttonWidth,
@@ -480,6 +715,10 @@ function presslearn_register_quick_button_block() {
             'infiniteAnimation' => array(
                 'type' => 'string',
                 'default' => 'yes'
+            ),
+            'borderRadius' => array(
+                'type' => 'number',
+                'default' => 4
             )
         )
     ));
@@ -500,6 +739,15 @@ function presslearn_register_quick_button_block() {
 add_action('init', 'presslearn_register_quick_button_block');
 
 function presslearn_render_quick_button($attributes, $content) {
+    if (!empty($content)) {
+        return $content;
+    }
+    
+    
+    if (!isset($attributes['borderRadius'])) {
+        $attributes['borderRadius'] = 4;
+    }
+    
     $attributes = wp_parse_args($attributes, array(
         'buttonText' => '버튼 텍스트',
         'buttonUrl' => '#',
@@ -511,8 +759,10 @@ function presslearn_render_quick_button($attributes, $content) {
         'buttonWidth' => 'default',
         'openInNewTab' => false,
         'buttonAnimation' => 'none',
-        'infiniteAnimation' => 'yes'
+        'infiniteAnimation' => 'yes',
+        'borderRadius' => 4
     ));
+    
     
     $button_padding = '12px 24px';
     switch ($attributes['buttonSize']) {
@@ -567,7 +817,7 @@ function presslearn_render_quick_button($attributes, $content) {
     $output = '<div class="presslearn-button-container" style="text-align:' . esc_attr($container_alignment) . ';margin:20px 0">';
     $output .= '<a class="' . esc_attr($animation_class) . '" href="' . esc_url($attributes['buttonUrl']) . '"' . $target_attr . $rel_attr;
     $output .= ' style="display:inline-block;padding:' . esc_attr($button_padding) . ';background-color:' . esc_attr($attributes['buttonColor']) . ';';
-    $output .= 'color:' . esc_attr($attributes['buttonTextColor']) . ';text-decoration:none;border-radius:4px;font-weight:bold;';
+    $output .= 'color:' . esc_attr($attributes['buttonTextColor']) . ';text-decoration:none;border-radius:' . esc_attr($attributes['borderRadius']) . 'px;font-weight:bold;';
     $output .= 'font-size:' . esc_attr($font_size) . ';width:' . esc_attr($button_width) . ';text-align:' . esc_attr($text_align) . ';';
     $output .= 'box-sizing:border-box;transition:all 0.3s ease-in-out" data-hover-color="' . esc_attr($attributes['buttonHoverColor'] ?: $attributes['buttonColor']) . '">';
     $output .= esc_html($attributes['buttonText'] ?: '버튼 텍스트') . '</a>';
@@ -722,3 +972,77 @@ function presslearn_quick_button_frontend_styles() {
     wp_add_inline_style('presslearn-button-frontend-styles', $frontend_styles);
 }
 add_action('wp_enqueue_scripts', 'presslearn_quick_button_frontend_styles');
+
+function presslearn_quick_button_frontend_scripts() {
+    if (!presslearn_is_plugin_active_for_buttons()) {
+        return;
+    }
+    
+    $quick_button_enabled = get_option('presslearn_quick_button_enabled', 'no');
+    if ($quick_button_enabled !== 'yes') {
+        return;
+    }
+    
+    wp_register_script('presslearn-button-frontend-script', false, array('jquery'), time(), true);
+    wp_enqueue_script('presslearn-button-frontend-script');
+    
+    $script = '
+    jQuery(document).ready(function($) {
+        $(document).on("mouseenter", ".presslearn-button", function() {
+            var $this = $(this);
+            var hoverColor = $this.attr("data-hover-color");
+            if (hoverColor) {
+                $this.data("original-color", $this.css("background-color"));
+                $this.css("background-color", hoverColor);
+            }
+        });
+        
+        $(document).on("mouseleave", ".presslearn-button", function() {
+            var $this = $(this);
+            var originalColor = $this.data("original-color");
+            if (originalColor) {
+                $this.css("background-color", originalColor);
+            }
+        });
+    });
+    ';
+    
+    wp_add_inline_script('presslearn-button-frontend-script', $script);
+}
+add_action('wp_enqueue_scripts', 'presslearn_quick_button_frontend_scripts');
+
+function presslearn_save_button_preset() {
+    check_ajax_referer('presslearn_button_preset', 'nonce');
+    
+    if (!current_user_can('edit_posts')) {
+        wp_send_json_error('권한이 없습니다.');
+    }
+    
+    $preset_data = isset($_POST['preset']) ? stripslashes($_POST['preset']) : '';
+    
+    if (empty($preset_data)) {
+        wp_send_json_error('프리셋 데이터가 없습니다.');
+    }
+    
+    $preset = json_decode($preset_data, true);
+    
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        wp_send_json_error('잘못된 프리셋 데이터입니다.');
+    }
+    
+    update_option('presslearn_button_preset', $preset);
+    wp_send_json_success('프리셋이 저장되었습니다.');
+}
+add_action('wp_ajax_presslearn_save_button_preset', 'presslearn_save_button_preset');
+
+function presslearn_delete_button_preset() {
+    check_ajax_referer('presslearn_button_preset', 'nonce');
+    
+    if (!current_user_can('edit_posts')) {
+        wp_send_json_error('권한이 없습니다.');
+    }
+    
+    delete_option('presslearn_button_preset');
+    wp_send_json_success('프리셋이 삭제되었습니다.');
+}
+add_action('wp_ajax_presslearn_delete_button_preset', 'presslearn_delete_button_preset');
