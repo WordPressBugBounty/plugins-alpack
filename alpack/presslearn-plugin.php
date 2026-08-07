@@ -3,7 +3,7 @@
  * Plugin Name: AL Pack - 워드프레스를 위한 통계, 광고 도구
  * Plugin URI: https://alpack.dev
  * Description: 통계, 글쓰기 SEO, 무효 트래픽 차단, 빠른 버튼 생성, 카카오 공유 버튼, 스크롤 팝업, 애드클리커 등 워드프레스를 위한 통합 플러그인
- * Version: 1.3.11
+ * Version: 1.3.12
  * Author: 프레스런
  * Author URI: https://alpack.dev
  * Text Domain: alpack
@@ -4972,3 +4972,28 @@ function presslearn_output_footer_code() {
         }
     }
 }
+
+/**
+ * 사용자가 헤더 & 푸터 토글을 직접 조작한 적이 없을 때만 기능을 켠다.
+ * 수동으로 끈 경우에는 그 선택을 덮어쓰지 않는다.
+ */
+function presslearn_auto_enable_header_footer() {
+    if (get_option('presslearn_header_footer_user_set', 'no') === 'yes') {
+        return;
+    }
+
+    if (get_option('presslearn_header_footer_enabled', 'no') === 'yes') {
+        return;
+    }
+
+    update_option('presslearn_header_footer_enabled', 'yes');
+}
+
+function presslearn_maybe_auto_enable_header_footer() {
+    if (!function_exists('presslearn_plugin') || !presslearn_plugin()->is_plugin_activated()) {
+        return;
+    }
+
+    presslearn_auto_enable_header_footer();
+}
+add_action('init', 'presslearn_maybe_auto_enable_header_footer');
