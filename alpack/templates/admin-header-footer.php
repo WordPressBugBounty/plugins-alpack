@@ -17,6 +17,7 @@ if (isset($_POST['presslearn_toggle_header_footer']) && isset($_POST['enable']))
         $enable = sanitize_text_field(wp_unslash($_POST['enable']));
         if ($enable === 'yes' || $enable === 'no') {
             update_option('presslearn_header_footer_enabled', $enable);
+            update_option('presslearn_header_footer_user_set', 'yes');
             $updated = true;
         }
     }
@@ -33,6 +34,7 @@ if (current_user_can('manage_options') && is_admin() && isset($_GET['action']) &
     
     if ($action === 'toggle' && $feature === 'header_footer' && ($enable === 'yes' || $enable === 'no')) {
         update_option('presslearn_header_footer_enabled', $enable);
+        update_option('presslearn_header_footer_user_set', 'yes');
         $updated = true;
     }
 }

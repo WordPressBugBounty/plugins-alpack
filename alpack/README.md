@@ -2,9 +2,9 @@
 Contributors: edwardnoh
 Tags: 통계, 애드클리커, 소셜 공유, 무효 트래픽 클릭 차단, 빠른 버튼 생성
 Requires at least: 5.0
-Tested up to: 6.8
+Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 1.3.1
+Stable tag: 1.3.11
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 

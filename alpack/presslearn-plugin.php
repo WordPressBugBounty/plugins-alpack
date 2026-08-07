@@ -3,7 +3,7 @@
  * Plugin Name: AL Pack - 워드프레스를 위한 통계, 광고 도구
  * Plugin URI: https://alpack.dev
  * Description: 통계, 글쓰기 SEO, 무효 트래픽 차단, 빠른 버튼 생성, 카카오 공유 버튼, 스크롤 팝업, 애드클리커 등 워드프레스를 위한 통합 플러그인
- * Version: 1.3.1
+ * Version: 1.3.11
  * Author: 프레스런
  * Author URI: https://alpack.dev
  * Text Domain: alpack
@@ -45,6 +45,7 @@ function presslearn_plugin_activate() {
         add_option('presslearn_button_transition_enabled', 'no');
         add_option('presslearn_auto_index_enabled', 'no');
         add_option('presslearn_header_footer_enabled', 'no');
+        add_option('presslearn_header_footer_user_set', 'no');
     } else {
         add_option('presslearn_scroll_depth_enabled', 'no');
         add_option('presslearn_analytics_enabled', 'no');
@@ -56,6 +57,7 @@ function presslearn_plugin_activate() {
         add_option('presslearn_button_transition_enabled', 'no');
         add_option('presslearn_auto_index_enabled', 'no');
         add_option('presslearn_header_footer_enabled', 'no');
+        add_option('presslearn_header_footer_user_set', 'no');
     }
         presslearn_create_tables();
     
@@ -155,6 +157,7 @@ function presslearn_plugin_deactivate() {
     delete_option('presslearn_button_transition_enabled');
     delete_option('presslearn_auto_index_enabled');
     delete_option('presslearn_header_footer_enabled');
+    delete_option('presslearn_header_footer_user_set');
 }
 
 function presslearn_plugin_activation_redirect() {
@@ -185,6 +188,7 @@ function presslearn_plugin_uninstall() {
     delete_option('presslearn_button_transition_enabled');
     delete_option('presslearn_auto_index_enabled');
     delete_option('presslearn_header_footer_enabled');
+    delete_option('presslearn_header_footer_user_set');
     delete_option('presslearn_click_protection_blocked_countries');
     delete_transient('presslearn_plugin_activation_redirect');
     

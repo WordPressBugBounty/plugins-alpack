@@ -316,6 +316,11 @@ class PressLearn_API {
 
     private static function perform_activation_tasks($key) {
         update_option('presslearn_plugin_activated_time', time());
+
+        if (function_exists('presslearn_auto_enable_header_footer')) {
+            presslearn_auto_enable_header_footer();
+        }
+
         self::log_activation_event($key);
     }
 
