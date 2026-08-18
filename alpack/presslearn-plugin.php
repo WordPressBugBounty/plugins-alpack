@@ -3,7 +3,7 @@
  * Plugin Name: AL Pack - 워드프레스를 위한 통계, 광고 도구
  * Plugin URI: https://alpack.dev
  * Description: 통계, 글쓰기 SEO, 무효 트래픽 차단, 빠른 버튼 생성, 카카오 공유 버튼, 스크롤 팝업, 애드클리커 등 워드프레스를 위한 통합 플러그인
- * Version: 1.3.12
+ * Version: 1.3.13
  * Author: 프레스런
  * Author URI: https://alpack.dev
  * Text Domain: alpack
@@ -26,8 +26,8 @@ function presslearn_plugin_activate() {
     $is_first_install = empty(get_option('presslearn_plugin_header_version', ''));
     
     update_option('presslearn_plugin_key', '');
-    update_option('presslearn_plugin_activated_time', time());
-    update_option('presslearn_activation_logs', array());
+    add_option('presslearn_plugin_activated_time', time());
+    add_option('presslearn_activation_logs', array());
     update_option('presslearn_plugin_settings', array(
         'initialized' => true,
         'version' => PRESSLEARN_PLUGIN_VERSION,
@@ -152,12 +152,6 @@ function presslearn_ensure_banners_table_exists() {
 
 function presslearn_plugin_deactivate() {
     delete_transient('presslearn_plugin_activation_redirect');
-    
-    delete_option('presslearn_quick_button_enabled');
-    delete_option('presslearn_button_transition_enabled');
-    delete_option('presslearn_auto_index_enabled');
-    delete_option('presslearn_header_footer_enabled');
-    delete_option('presslearn_header_footer_user_set');
 }
 
 function presslearn_plugin_activation_redirect() {
@@ -505,9 +499,6 @@ class PressLearn_Plugin {
         $saved_header_version = get_option('presslearn_plugin_header_version', '');
         
         if (!empty($saved_header_version) && $saved_header_version !== $current_header_version) {
-            update_option('presslearn_plugin_key', '');
-            $this->is_activated = false;
-            
             set_transient('presslearn_plugin_updated_notice', array(
                 'from_version' => $saved_header_version,
                 'to_version' => $current_header_version,
@@ -4702,7 +4693,26 @@ function presslearn_add_dashboard_widget() {
     }
 }
 
-function presslearn_render_dashboard_widget() {
+function presslearn_calculate_change($current, $previous) {
+    if ($previous == 0) {
+        return [
+            'percentage' => 0,
+            'show' => false
+        ];
+    }
+    
+    $change = $current - $previous;
+    $percentage = round(($change / $previous) * 100);
+    
+    return [
+        'change' => $change,
+        'percentage' => $percentage,
+        'show' => true,
+        'is_increase' => $change > 0
+    ];
+}
+
+function presslearn_build_dashboard_stats() {
     global $wpdb;
     $table_pageviews = $wpdb->prefix . 'presslearn_pageviews';
     
@@ -4715,77 +4725,86 @@ function presslearn_render_dashboard_widget() {
         'prev_ip_visitors' => 0
     ];
     
-    if($wpdb->get_var("SHOW TABLES LIKE '$table_pageviews'") == $table_pageviews) {
-        $current_week_condition = "WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)";
+    if ($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table_pageviews)) === $table_pageviews) {
+        $current = $wpdb->get_row("
+            SELECT COUNT(*) AS pageviews,
+                   COUNT(DISTINCT visitor_id) AS visitors,
+                   COUNT(DISTINCT ip) AS ip_visitors
+            FROM $table_pageviews
+            WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+        ", ARRAY_A);
         
-        $pageviews = $wpdb->get_var("
-            SELECT COUNT(*) 
-            FROM $table_pageviews 
-            $current_week_condition
-        ");
+        $previous = $wpdb->get_row("
+            SELECT COUNT(*) AS pageviews,
+                   COUNT(DISTINCT visitor_id) AS visitors,
+                   COUNT(DISTINCT ip) AS ip_visitors
+            FROM $table_pageviews
+            WHERE created_at BETWEEN DATE_SUB(CURDATE(), INTERVAL 14 DAY) AND DATE_SUB(CURDATE(), INTERVAL 8 DAY)
+        ", ARRAY_A);
         
-        $visitors = $wpdb->get_var("
-            SELECT COUNT(DISTINCT visitor_id) 
-            FROM $table_pageviews 
-            $current_week_condition
-        ");
-        
-        $ip_visitors = $wpdb->get_var("
-            SELECT COUNT(DISTINCT ip) 
-            FROM $table_pageviews 
-            $current_week_condition
-        ");
-        
-        $prev_week_condition = "WHERE created_at BETWEEN DATE_SUB(CURDATE(), INTERVAL 14 DAY) AND DATE_SUB(CURDATE(), INTERVAL 8 DAY)";
-        
-        $prev_pageviews = $wpdb->get_var("
-            SELECT COUNT(*) 
-            FROM $table_pageviews 
-            $prev_week_condition
-        ");
-        
-        $prev_visitors = $wpdb->get_var("
-            SELECT COUNT(DISTINCT visitor_id) 
-            FROM $table_pageviews 
-            $prev_week_condition
-        ");
-        
-        $prev_ip_visitors = $wpdb->get_var("
-            SELECT COUNT(DISTINCT ip) 
-            FROM $table_pageviews 
-            $prev_week_condition
-        ");
-        
-        $stats['pageviews'] = $pageviews ? intval($pageviews) : 0;
-        $stats['visitors'] = $visitors ? intval($visitors) : 0;
-        $stats['ip_visitors'] = $ip_visitors ? intval($ip_visitors) : 0;
-        $stats['prev_pageviews'] = $prev_pageviews ? intval($prev_pageviews) : 0;
-        $stats['prev_visitors'] = $prev_visitors ? intval($prev_visitors) : 0;
-        $stats['prev_ip_visitors'] = $prev_ip_visitors ? intval($prev_ip_visitors) : 0;
-    }
-    
-    function presslearn_calculate_change($current, $previous) {
-        if ($previous == 0) {
-            return [
-                'percentage' => 0,
-                'show' => false
-            ];
+        if (is_array($current)) {
+            $stats['pageviews'] = intval($current['pageviews']);
+            $stats['visitors'] = intval($current['visitors']);
+            $stats['ip_visitors'] = intval($current['ip_visitors']);
         }
         
-        $change = $current - $previous;
-        $percentage = round(($change / $previous) * 100);
-        
-        return [
-            'change' => $change,
-            'percentage' => $percentage,
-            'show' => true,
-            'is_increase' => $change > 0
-        ];
+        if (is_array($previous)) {
+            $stats['prev_pageviews'] = intval($previous['pageviews']);
+            $stats['prev_visitors'] = intval($previous['visitors']);
+            $stats['prev_ip_visitors'] = intval($previous['ip_visitors']);
+        }
     }
     
-    $pageviews_change = presslearn_calculate_change($stats['pageviews'], $stats['prev_pageviews']);
-    $visitors_change = presslearn_calculate_change($stats['visitors'], $stats['prev_visitors']);
-    $ip_visitors_change = presslearn_calculate_change($stats['ip_visitors'], $stats['prev_ip_visitors']);
+    set_transient('presslearn_dashboard_stats', $stats, 10 * MINUTE_IN_SECONDS);
+    
+    return $stats;
+}
+
+function presslearn_render_dashboard_stats_html($stats) {
+    $items = [
+        ['label' => '조회', 'value' => $stats['pageviews'], 'prev' => $stats['prev_pageviews']],
+        ['label' => '방문자 (IP 기준)', 'value' => $stats['ip_visitors'], 'prev' => $stats['prev_ip_visitors']],
+        ['label' => '방문자 (브라우저 기준)', 'value' => $stats['visitors'], 'prev' => $stats['prev_visitors']],
+    ];
+    
+    ob_start();
+    
+    foreach ($items as $item) {
+        $change = presslearn_calculate_change($item['value'], $item['prev']);
+        ?>
+        <div class="pl-widget-stat">
+            <div class="pl-widget-stat-label"><?php echo esc_html($item['label']); ?></div>
+            <div class="pl-widget-stat-value"><?php echo esc_html(number_format($item['value'])); ?></div>
+            <?php if ($change['show']): ?>
+            <div class="pl-widget-stat-change <?php echo esc_attr($change['is_increase'] ? 'increase' : 'decrease'); ?>">
+                <?php echo esc_html($change['is_increase'] ? '▲' : '▼'); ?> 
+                <?php echo esc_html(number_format(abs($change['change']))); ?>
+                (<?php echo esc_html(abs($change['percentage'])); ?>%)
+            </div>
+            <?php endif; ?>
+        </div>
+        <?php
+    }
+    
+    return ob_get_clean();
+}
+
+add_action('wp_ajax_presslearn_dashboard_stats', 'presslearn_ajax_dashboard_stats');
+
+function presslearn_ajax_dashboard_stats() {
+    check_ajax_referer('presslearn_dashboard_stats', 'nonce');
+    
+    if (!current_user_can('read')) {
+        wp_send_json_error(array('message' => '권한이 없습니다.'));
+    }
+    
+    $stats = presslearn_build_dashboard_stats();
+    
+    wp_send_json_success(array('html' => presslearn_render_dashboard_stats_html($stats)));
+}
+
+function presslearn_render_dashboard_widget() {
+    $stats = get_transient('presslearn_dashboard_stats');
     
     ?>
     <style>
@@ -4807,6 +4826,12 @@ function presslearn_render_dashboard_widget() {
         }
         .pl-widget-stats {
             padding: 15px;
+        }
+        .pl-widget-placeholder {
+            color: #666;
+            font-size: 13px;
+            padding: 20px 0;
+            text-align: center;
         }
         .pl-widget-stat {
             margin-bottom: 15px;
@@ -4861,48 +4886,51 @@ function presslearn_render_dashboard_widget() {
             <span class="pl-widget-period">최근 7일</span>
         </div>
         
-        <div class="pl-widget-stats">
-            <div class="pl-widget-stat">
-                <div class="pl-widget-stat-label">조회</div>
-                <div class="pl-widget-stat-value"><?php echo esc_html(number_format($stats['pageviews'])); ?></div>
-                <?php if ($pageviews_change['show']): ?>
-                <div class="pl-widget-stat-change <?php echo esc_attr($pageviews_change['is_increase'] ? 'increase' : 'decrease'); ?>">
-                    <?php echo esc_html($pageviews_change['is_increase'] ? '▲' : '▼'); ?> 
-                    <?php echo esc_html(number_format(abs($pageviews_change['change']))); ?>
-                    (<?php echo esc_html(abs($pageviews_change['percentage'])); ?>%)
-                </div>
-                <?php endif; ?>
-            </div>
-            
-            <div class="pl-widget-stat">
-                <div class="pl-widget-stat-label">방문자 (IP 기준)</div>
-                <div class="pl-widget-stat-value"><?php echo esc_html(number_format($stats['ip_visitors'])); ?></div>
-                <?php if ($ip_visitors_change['show']): ?>
-                <div class="pl-widget-stat-change <?php echo esc_attr($ip_visitors_change['is_increase'] ? 'increase' : 'decrease'); ?>">
-                    <?php echo esc_html($ip_visitors_change['is_increase'] ? '▲' : '▼'); ?> 
-                    <?php echo esc_html(number_format(abs($ip_visitors_change['change']))); ?>
-                    (<?php echo esc_html(abs($ip_visitors_change['percentage'])); ?>%)
-                </div>
-                <?php endif; ?>
-            </div>
-            
-            <div class="pl-widget-stat">
-                <div class="pl-widget-stat-label">방문자 (브라우저 기준)</div>
-                <div class="pl-widget-stat-value"><?php echo esc_html(number_format($stats['visitors'])); ?></div>
-                <?php if ($visitors_change['show']): ?>
-                <div class="pl-widget-stat-change <?php echo esc_attr($visitors_change['is_increase'] ? 'increase' : 'decrease'); ?>">
-                    <?php echo esc_html($visitors_change['is_increase'] ? '▲' : '▼'); ?> 
-                    <?php echo esc_html(number_format(abs($visitors_change['change']))); ?>
-                    (<?php echo esc_html(abs($visitors_change['percentage'])); ?>%)
-                </div>
-                <?php endif; ?>
-            </div>
+        <div class="pl-widget-stats" id="pl-widget-stats">
+            <?php if (is_array($stats)): ?>
+                <?php echo presslearn_render_dashboard_stats_html($stats); ?>
+            <?php else: ?>
+                <div class="pl-widget-placeholder">통계를 불러오는 중입니다.</div>
+            <?php endif; ?>
         </div>
         
         <div class="pl-widget-footer">
             <a href="<?php echo esc_url(admin_url('admin.php?page=presslearn-analytics&tab=statistics')); ?>">전체 통계 보기 →</a>
         </div>
     </div>
+    
+    <?php if (!is_array($stats)): ?>
+    <script>
+    (function() {
+        var target = document.getElementById('pl-widget-stats');
+        if (!target) {
+            return;
+        }
+        
+        var params = new URLSearchParams();
+        params.append('action', 'presslearn_dashboard_stats');
+        params.append('nonce', <?php echo wp_json_encode(wp_create_nonce('presslearn_dashboard_stats')); ?>);
+        
+        fetch(<?php echo wp_json_encode(admin_url('admin-ajax.php')); ?>, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: params.toString()
+        })
+        .then(function(response) { return response.json(); })
+        .then(function(result) {
+            if (result && result.success && result.data && result.data.html) {
+                target.innerHTML = result.data.html;
+            } else {
+                target.innerHTML = '<div class="pl-widget-placeholder">통계를 불러오지 못했습니다.</div>';
+            }
+        })
+        .catch(function() {
+            target.innerHTML = '<div class="pl-widget-placeholder">통계를 불러오지 못했습니다.</div>';
+        });
+    })();
+    </script>
+    <?php endif; ?>
     <?php
 }
 

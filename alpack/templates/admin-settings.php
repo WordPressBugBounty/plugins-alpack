@@ -135,68 +135,12 @@ $header_footer_enabled = get_option('presslearn_header_footer_enabled', 'no');
                 
                 <?php 
                 function alpack_get_week_stats() {
-                    global $wpdb;
-                    $table_pageviews = $wpdb->prefix . 'presslearn_pageviews';
-                    
-                    $stats = [
-                        'pageviews' => 0,
-                        'visitors' => 0,
-                        'ip_visitors' => 0,
-                        'prev_pageviews' => 0,
-                        'prev_visitors' => 0,
-                        'prev_ip_visitors' => 0
-                    ];
-                    
-                    if($wpdb->get_var("SHOW TABLES LIKE '$table_pageviews'") == $table_pageviews) {
-                        $current_week_condition = "WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)";
-                        
-                        $pageviews = $wpdb->get_var("
-                            SELECT COUNT(*) 
-                            FROM $table_pageviews 
-                            $current_week_condition
-                        ");
-                        
-                        $visitors = $wpdb->get_var("
-                            SELECT COUNT(DISTINCT visitor_id) 
-                            FROM $table_pageviews 
-                            $current_week_condition
-                        ");
-                        
-                        $ip_visitors = $wpdb->get_var("
-                            SELECT COUNT(DISTINCT ip) 
-                            FROM $table_pageviews 
-                            $current_week_condition
-                        ");
-                        
-                        $prev_week_condition = "WHERE created_at BETWEEN DATE_SUB(CURDATE(), INTERVAL 14 DAY) AND DATE_SUB(CURDATE(), INTERVAL 8 DAY)";
-                        
-                        $prev_pageviews = $wpdb->get_var("
-                            SELECT COUNT(*) 
-                            FROM $table_pageviews 
-                            $prev_week_condition
-                        ");
-                        
-                        $prev_visitors = $wpdb->get_var("
-                            SELECT COUNT(DISTINCT visitor_id) 
-                            FROM $table_pageviews 
-                            $prev_week_condition
-                        ");
-                        
-                        $prev_ip_visitors = $wpdb->get_var("
-                            SELECT COUNT(DISTINCT ip) 
-                            FROM $table_pageviews 
-                            $prev_week_condition
-                        ");
-                        
-                        $stats['pageviews'] = $pageviews ? intval($pageviews) : 0;
-                        $stats['visitors'] = $visitors ? intval($visitors) : 0;
-                        $stats['ip_visitors'] = $ip_visitors ? intval($ip_visitors) : 0;
-                        $stats['prev_pageviews'] = $prev_pageviews ? intval($prev_pageviews) : 0;
-                        $stats['prev_visitors'] = $prev_visitors ? intval($prev_visitors) : 0;
-                        $stats['prev_ip_visitors'] = $prev_ip_visitors ? intval($prev_ip_visitors) : 0;
+                    $cached = get_transient('presslearn_dashboard_stats');
+                    if (is_array($cached)) {
+                        return $cached;
                     }
                     
-                    return $stats;
+                    return presslearn_build_dashboard_stats();
                 }
                 
                 $week_stats = alpack_get_week_stats();
