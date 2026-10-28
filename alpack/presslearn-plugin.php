@@ -3,7 +3,7 @@
  * Plugin Name: AL Pack - 워드프레스를 위한 통계, 광고 도구
  * Plugin URI: https://alpack.dev
  * Description: 통계, 글쓰기 SEO, 무효 트래픽 차단, 빠른 버튼 생성, 카카오 공유 버튼, 스크롤 팝업, 애드클리커 등 워드프레스를 위한 통합 플러그인
- * Version: 1.3.13
+ * Version: 1.3.14
  * Author: 프레스런
  * Author URI: https://alpack.dev
  * Text Domain: alpack
@@ -1513,7 +1513,7 @@ class PressLearn_Plugin {
             }
         }
         
-        return $ip;
+        return filter_var($ip, FILTER_VALIDATE_IP) ? $ip : '';
     }
 
     public function add_admin_bar_menu($wp_admin_bar) {
@@ -1994,6 +1994,32 @@ function presslearn_check_and_remove_expired_blocked_ips() {
         update_option('presslearn_click_protection_blocked_ips', $new_blocked_ips);
     }
 }
+
+function presslearn_purge_invalid_protection_ips() {
+    if (get_option('presslearn_protection_ips_purged', '') === 'yes') {
+        return;
+    }
+    
+    $option_names = array('presslearn_click_protection_blocked_ips', 'presslearn_click_protection_allowed_ips');
+    
+    foreach ($option_names as $option_name) {
+        $items = get_option($option_name, array());
+        if (!is_array($items)) {
+            continue;
+        }
+        
+        $valid_items = array_values(array_filter($items, function($item) {
+            return is_array($item) && isset($item['ip']) && filter_var($item['ip'], FILTER_VALIDATE_IP);
+        }));
+        
+        if (count($valid_items) !== count($items)) {
+            update_option($option_name, $valid_items);
+        }
+    }
+    
+    update_option('presslearn_protection_ips_purged', 'yes');
+}
+add_action('admin_init', 'presslearn_purge_invalid_protection_ips');
 
 register_deactivation_hook(__FILE__, 'presslearn_clear_cron_for_ip_unblock');
 
@@ -2793,6 +2819,11 @@ function presslearn_block_current_ip_ajax() {
     }
     
     $user_ip = presslearn_plugin()->get_visitor_ip_for_protection();
+    
+    if (empty($user_ip)) {
+        wp_send_json_error(array('message' => '유효한 IP 주소를 확인할 수 없습니다.'));
+        wp_die();
+    }
     
     $allowed_ips = get_option('presslearn_click_protection_allowed_ips', array());
     foreach ($allowed_ips as $item) {

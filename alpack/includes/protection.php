@@ -515,13 +515,24 @@ function presslearn_protection_admin_scripts() {
                 
                 allowedIPs.forEach((item) => {
                     const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td>\${item.ip}</td>
-                        <td>\${item.date}</td>
-                        <td>
-                            <button type=\"button\" class=\"delete-ip\" data-ip=\"\${item.ip}\">삭제</button>
-                        </td>
-                    `;
+
+                    const ipCell = document.createElement('td');
+                    ipCell.textContent = item.ip;
+
+                    const dateCell = document.createElement('td');
+                    dateCell.textContent = item.date;
+
+                    const actionCell = document.createElement('td');
+                    const deleteButton = document.createElement('button');
+                    deleteButton.type = 'button';
+                    deleteButton.className = 'delete-ip';
+                    deleteButton.setAttribute('data-ip', item.ip);
+                    deleteButton.textContent = '삭제';
+                    actionCell.appendChild(deleteButton);
+
+                    row.appendChild(ipCell);
+                    row.appendChild(dateCell);
+                    row.appendChild(actionCell);
                     tbody.appendChild(row);
                 });
                 
@@ -549,16 +560,25 @@ function presslearn_protection_admin_scripts() {
                 
                 blockedIPs.forEach((item) => {
                     const row = document.createElement('tr');
-                    const expiryText = item.expires ? item.expires : '영구 차단';
-                    const reasonText = item.reason || '수동 차단';
-                    
-                    row.innerHTML = `
-                        <td>\${item.ip}</td>
-                        <td>\${item.date}</td>
-                        <td>
-                            <button type=\"button\" class=\"delete-blocked-ip\" data-ip=\"\${item.ip}\" title=\"이 IP를 차단 목록에서 제거하고 로컬 스토리지를 리셋합니다\">삭제</button>
-                        </td>
-                    `;
+
+                    const ipCell = document.createElement('td');
+                    ipCell.textContent = item.ip;
+
+                    const dateCell = document.createElement('td');
+                    dateCell.textContent = item.date;
+
+                    const actionCell = document.createElement('td');
+                    const deleteButton = document.createElement('button');
+                    deleteButton.type = 'button';
+                    deleteButton.className = 'delete-blocked-ip';
+                    deleteButton.setAttribute('data-ip', item.ip);
+                    deleteButton.title = '이 IP를 차단 목록에서 제거하고 로컬 스토리지를 리셋합니다';
+                    deleteButton.textContent = '삭제';
+                    actionCell.appendChild(deleteButton);
+
+                    row.appendChild(ipCell);
+                    row.appendChild(dateCell);
+                    row.appendChild(actionCell);
                     tbody.appendChild(row);
                 });
                 
@@ -1193,29 +1213,48 @@ function presslearn_protection_admin_scripts() {
                 logs.forEach((item) => {
                     let statusClass = 'log-active';
                     let expiryText = item.expires || '영구 차단';
-                    let actionButton = '';
+                    let showUnblockButton = true;
                     
                     if (item.expires) {
                         const expiryDate = new Date(item.expires);
                         if (expiryDate < today) {
                             statusClass = 'log-expired';
                             expiryText += ' (만료됨)';
-                        } else {
-                            actionButton = `<button type=\"button\" class=\"unblock-ip-from-log\" data-ip=\"\${item.ip}\" style=\"color: #d32f2f; background: none; border: none; cursor: pointer; text-decoration: underline;\">해지</button>`;
+                            showUnblockButton = false;
                         }
-                    } else {
-                        actionButton = `<button type=\"button\" class=\"unblock-ip-from-log\" data-ip=\"\${item.ip}\" style=\"color: #d32f2f; background: none; border: none; cursor: pointer; text-decoration: underline;\">해지</button>`;
                     }
                     
                     const row = document.createElement('tr');
                     row.className = statusClass;
-                    row.innerHTML = `
-                        <td>\${item.ip}</td>
-                        <td>\${item.block_date || item.date}</td>
-                        <td>\${item.reason || '수동 차단'}</td>
-                        <td>\${expiryText}</td>
-                        <td>\${actionButton}</td>
-                    `;
+
+                    const ipCell = document.createElement('td');
+                    ipCell.textContent = item.ip;
+
+                    const dateCell = document.createElement('td');
+                    dateCell.textContent = item.block_date || item.date;
+
+                    const reasonCell = document.createElement('td');
+                    reasonCell.textContent = item.reason || '수동 차단';
+
+                    const expiryCell = document.createElement('td');
+                    expiryCell.textContent = expiryText;
+
+                    const actionCell = document.createElement('td');
+                    if (showUnblockButton) {
+                        const unblockButton = document.createElement('button');
+                        unblockButton.type = 'button';
+                        unblockButton.className = 'unblock-ip-from-log';
+                        unblockButton.setAttribute('data-ip', item.ip);
+                        unblockButton.setAttribute('style', 'color: #d32f2f; background: none; border: none; cursor: pointer; text-decoration: underline;');
+                        unblockButton.textContent = '해지';
+                        actionCell.appendChild(unblockButton);
+                    }
+
+                    row.appendChild(ipCell);
+                    row.appendChild(dateCell);
+                    row.appendChild(reasonCell);
+                    row.appendChild(expiryCell);
+                    row.appendChild(actionCell);
                     tbody.appendChild(row);
                 });
                 
